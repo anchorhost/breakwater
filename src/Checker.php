@@ -245,8 +245,7 @@ final class Checker {
     public static function disposable( string $domain ): bool {
         static $list = null;
         if ( null === $list ) {
-            $file = Plugin::dir() . '/data/disposable-domains.txt';
-            $list = is_readable( $file ) ? array_flip( file( $file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES ) ?: [] ) : [];
+            $list = array_flip( Assets::disposableDomains() );
         }
         return isset( $list[ $domain ] );
     }

@@ -28,7 +28,7 @@ final class Admin {
 
     public static function assets( mixed $hook ): void {
         if ( 'tools_page_' . self::SLUG === $hook ) {
-            wp_enqueue_style( 'breakwater-admin', plugins_url( 'assets/admin.css', Plugin::file() ), [], Plugin::VERSION );
+            Assets::enqueueAdminStyle();
         }
     }
 
@@ -141,10 +141,10 @@ final class Admin {
             'send_failed' => 'The email could not be sent. Check the site can send mail, then try again.',
         ];
         $found = array_map( fn ( $adapter ): string => $adapter->label(), Registry::detected() );
-        $mark  = plugins_url( 'assets/mark.svg', Plugin::file() );
+        $mark  = Assets::markUrl();
         ?>
         <div class="wrap bw-admin">
-            <h1 class="bw-title"><img src="<?php echo esc_url( $mark ); ?>" alt="" width="32" height="32"> Breakwater</h1>
+            <h1 class="bw-title"><img src="<?php echo esc_url( $mark, [ 'http', 'https', 'data' ] ); ?>" alt="" width="32" height="32"> Breakwater</h1>
             <?php if ( isset( $notes[ $note ] ) ) : ?>
                 <div class="notice <?php echo 'send_failed' === $note ? 'notice-error' : 'notice-success'; ?> is-dismissible"><p><?php echo esc_html( $notes[ $note ] ); ?></p></div>
             <?php endif; ?>
