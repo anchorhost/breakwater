@@ -10,6 +10,9 @@
  * rides along with any same-site request however the payload is built.
  *
  * The work starts when someone touches a field, so most visitors never pay for it.
+ *
+ * Time and counts carry over a form submit that loads a new page in the same tab (a multi-page
+ * form's Next, a validation error), so the last step of a long form is not judged on its own.
  */
 ( function () {
 	'use strict';
@@ -22,6 +25,7 @@
 	var started = Date.now();
 	var touches = 0;
 	var keys = 0;
+	carried();
 	var token = '';
 	var solving = null;
 
@@ -38,6 +42,10 @@
 	document.addEventListener( 'pointerdown', function ( event ) {
 		touches++;
 		remember();
+		// Gravity Forms turns pages with form.submit(), which fires no submit event.
+		if ( event.target && event.target.closest && event.target.closest( 'form button, form [type="submit"], form [type="button"]' ) ) {
+			carry();
+		}
 		// A click on something that sends a form: fetch a fresh proof for the next send,
 		// since AJAX forms never fire a submit event we could hook.
 		if ( event.target && event.target.closest && event.target.closest( 'button, [type="submit"], [role="button"]' ) && ( token || solving ) ) {
@@ -45,13 +53,45 @@
 		}
 	}, { capture: true, passive: true } );
 	document.addEventListener( 'touchstart', function () { touches++; remember(); }, { capture: true, passive: true } );
-	document.addEventListener( 'keydown', function () { keys++; }, true );
+	document.addEventListener( 'keydown', function ( event ) {
+		keys++;
+		if ( event.key === 'Enter' && event.target && event.target.closest && event.target.closest( 'form' ) ) {
+			carry();
+		}
+	}, true );
 	document.addEventListener( 'input', remember, true );
 	document.addEventListener( 'focusin', function ( event ) {
 		if ( event.target && event.target.matches && event.target.matches( 'input, textarea, select' ) ) {
 			solve();
 		}
 	}, true );
+
+	// Picks up where the page before left off, if it was a form sent less than 30 minutes ago.
+	function carried() {
+		try {
+			var saved = JSON.parse( sessionStorage.getItem( 'bw_carry' ) || 'null' );
+			sessionStorage.removeItem( 'bw_carry' );
+			if ( saved && Date.now() - saved.at < 1800000 && saved.s <= Date.now() ) {
+				started = saved.s;
+				touches = saved.i;
+				keys = saved.k;
+			}
+		} catch ( e ) {}
+	}
+
+	function carry() {
+		try {
+			sessionStorage.setItem( 'bw_carry', JSON.stringify( { s: started, i: touches, k: keys, at: Date.now() } ) );
+		} catch ( e ) {}
+	}
+
+	// Gravity Forms Next and Previous: nothing is judged until the last page, so never hold them.
+	function pageTurn( form ) {
+		var id = ( form.id || '' ).replace( /^gform_/, '' );
+		var target = form.querySelector( 'input[name="gform_target_page_number_' + id + '"]' );
+		var save = form.querySelector( 'input[name="gform_save"]' );
+		return !! target && target.value !== '' && target.value !== '0' && ! ( save && save.value );
+	}
 
 	function meta() {
 		return JSON.stringify( {
@@ -198,6 +238,11 @@
 		}
 		field( form, 'bw_meta', meta() );
 		remember();
+		carry();
+		if ( pageTurn( form ) ) {
+			solve();
+			return;
+		}
 		if ( token ) {
 			field( form, 'bw_token', token );
 			spent();

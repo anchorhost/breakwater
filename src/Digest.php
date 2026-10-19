@@ -14,7 +14,6 @@ final class Digest {
     public const HOOK = 'breakwater_digest';
 
     /** Signals that mean a bot beyond reasonable doubt. */
-    private const CERTAIN = [ 'honeypot', 'no_js', 'pow_invalid', 'webdriver', 'injection' ];
 
     public static function register(): void {
         add_action( self::HOOK, [ self::class, 'run' ] );
@@ -41,7 +40,7 @@ final class Digest {
         $bots   = [];
         foreach ( $rows as $row ) {
             $signals = json_decode( (string) $row->signals, true ) ?: [];
-            if ( array_intersect( self::CERTAIN, array_keys( $signals ) ) ) {
+            if ( array_intersect( Checker::CERTAIN, array_keys( $signals ) ) ) {
                 $bots[] = (int) $row->id;
                 continue;
             }

@@ -58,6 +58,8 @@ final class Submission {
     /** @var array<string, mixed>|null timing and interaction counts from the script, null when it never ran */
     public ?array $meta    = null;
     public string $trap    = '';
+    /** The visitor came back to a form they saved earlier (the form plugin vouches for it). */
+    public bool $continued = false;
     /** The other spam service's verdict for comparison: null when nothing else judged it. */
     public ?bool $other    = null;
 

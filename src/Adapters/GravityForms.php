@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Breakwater\Adapters;
 
+use Breakwater\Checker;
 use Breakwater\Feedback;
 use Breakwater\Guard;
 use Breakwater\Submission;
@@ -11,6 +12,10 @@ use Breakwater\Submission;
 /**
  * Gravity Forms. Spam is saved as a spam entry with the reason in its notes, notifications
  * are skipped, and "Not Spam" in the entry list restores it.
+ *
+ * Multi-page forms are judged once, on the final submit (gform_entry_is_spam never fires on
+ * Next or Previous), with every page's fields in the entry. Save and Continue is checked too:
+ * a draft makes Gravity Forms email a resume link to any address typed in, so bots abuse it.
  */
 final class GravityForms extends Adapter {
 
@@ -21,6 +26,7 @@ final class GravityForms extends Adapter {
 
     public function register(): void {
         add_filter( 'gform_entry_is_spam', $this->check( ... ), 99, 3 );
+        add_filter( 'gform_abort_submission_with_confirmation', $this->checkDraft( ... ), 99, 2 );
         add_action( 'gform_entry_created', $this->link( ... ), 10, 1 );
         add_action( 'gform_post_update_entry_property', $this->statusChanged( ... ), 10, 4 );
         add_action( 'breakwater_not_spam', $this->restore( ... ) );
@@ -88,8 +94,9 @@ final class GravityForms extends Adapter {
         if ( ! $form_id || ! isset( $_POST[ 'is_submit_' . $form_id ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
             return (bool) $is_spam; // Entries created from code or the REST API.
         }
-        $s        = Submission::fromFields( $this->source(), $form_id . ': ' . ( $form['title'] ?? '' ), self::fields( $form, $entry ) );
-        $s->other = (bool) $is_spam;
+        $s            = Submission::fromFields( $this->source(), $form_id . ': ' . ( $form['title'] ?? '' ), self::fields( $form, $entry ) );
+        $s->other     = (bool) $is_spam;
+        $s->continued = self::resumed( $form_id );
 
         $verdict = $this->evaluate( $s );
         if ( ! $verdict->act ) {
@@ -99,6 +106,33 @@ final class GravityForms extends Adapter {
             \GFCommon::set_spam_filter( $form_id, 'Breakwater', $verdict->reason() );
         }
         return true;
+    }
+
+    /**
+     * Save and Continue. Nothing is stored for a held draft (there is no entry yet), so only
+     * signals no person trips stop it; the visitor sees the form's confirmation, as for spam.
+     *
+     * @param array<string, mixed> $form
+     */
+    private function checkDraft( mixed $abort, mixed $form ): mixed {
+        $form_id = is_array( $form ) ? (int) ( $form['id'] ?? 0 ) : 0;
+        if ( $abort || ! $form_id || empty( $_POST['gform_save'] ) || ! isset( $_POST[ 'is_submit_' . $form_id ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+            return $abort;
+        }
+        $s            = Submission::fromRequest( $this->source(), $form_id . ': ' . ( $form['title'] ?? '' ) . ' (saved draft)' );
+        $s->continued = self::resumed( $form_id );
+        $verdict      = $this->evaluate( $s );
+        return $verdict->act && array_intersect( Checker::CERTAIN, array_keys( $verdict->signals ) ) ? true : $abort;
+    }
+
+    /** The visitor resumed a draft Gravity Forms saved for this form (it still exists until the entry is saved). */
+    private static function resumed( int $form_id ): bool {
+        $token = isset( $_POST['gform_resume_token'] ) && is_string( $_POST['gform_resume_token'] ) ? sanitize_key( $_POST['gform_resume_token'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+        if ( '' === $token || ! class_exists( 'GFFormsModel' ) ) {
+            return false;
+        }
+        $draft = \GFFormsModel::get_draft_submission_values( $token );
+        return is_array( $draft ) && $form_id === (int) ( $draft['form_id'] ?? 0 );
     }
 
     /**

@@ -12,6 +12,9 @@ final class Checker {
 
     public const THRESHOLD = 5;
 
+    /** Signals only automation produces: no person trips them, so they can be acted on alone. */
+    public const CERTAIN = [ 'honeypot', 'no_js', 'pow_invalid', 'webdriver', 'injection' ];
+
     public const PHRASES = [
         'seo services', 'backlink', 'first page of google', 'page 1 of google', 'rank your website', 'ranking on google',
         'increase your traffic', 'website traffic', 'guest post', 'link building', 'domain authority',
@@ -78,10 +81,11 @@ final class Checker {
         }
         $elapsed = (int) ( $meta['e'] ?? 0 );
         $touches = (int) ( $meta['i'] ?? 0 ) + (int) ( $meta['k'] ?? 0 );
-        if ( $elapsed > 0 && $elapsed < 2500 ) {
+        // A visitor resuming a saved form has already done the typing, so time on this page says little.
+        if ( $elapsed > 0 && $elapsed < 2500 && ! $this->s->continued ) {
             $this->add( 'too_fast', 3, sprintf( 'sent %.1fs after the page loaded', $elapsed / 1000 ) );
         }
-        if ( 0 === $touches ) {
+        if ( 0 === $touches && ! $this->s->continued ) {
             $this->add( 'no_interaction', 2, 'no clicks, taps or keys' );
         }
         if ( ! empty( $meta['w'] ) ) {
