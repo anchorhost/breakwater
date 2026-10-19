@@ -75,6 +75,26 @@ Every spam submission keeps its full payload in the Breakwater log (Tools → Br
 
 Pin a mode fleet-wide with `define( 'BREAKWATER_MODE', 'monitor' );`.
 
+## Single-file mu-plugin
+
+For hosts deploying across many sites, Breakwater builds into one self-contained file: every class in bracketed namespace blocks, with the script, admin stylesheet, mark and disposable-domain list embedded (`src/Assets.php` serves them from the bundle instead of from files).
+
+```
+php bin/build-mu-plugin.php                       # → dist/breakwater.php
+php bin/mu-deploy-script.php --mode=monitor       # → dist/deploy-mu.sh (embeds the build)
+php bin/mu-deploy-script.php --remove             # → dist/remove-mu.sh
+```
+
+`deploy-mu.sh` runs in a site's web root (for example `captaincore ssh <sites> --script=dist/deploy-mu.sh --parallel=20 --label`). Per site it:
+
+- skips anything that isn't WordPress, runs PHP older than 8.1 (the file would not parse), or has the regular plugin active;
+- writes `mu-plugins/breakwater.php` atomically after checking its sha256;
+- sets the mode given with `--mode` only on sites that have never had one (`--force-mode` sets it everywhere);
+- loads WordPress to confirm Breakwater boots, and removes the file again if it doesn't;
+- prints one line: `BREAKWATER|<home>|installed|<version> <mode>` (or `skip` / `failed` with the reason).
+
+`remove-mu.sh` takes the file out and keeps the site's settings and log. When both the mu-plugin and the regular plugin are present, the mu-plugin loads first and the plugin stands aside.
+
 ## WP-CLI
 
 ```
