@@ -1,0 +1,36 @@
+/* Tools → Breakwater. WordPress's own admin look, with Breakwater's colours for status. */
+.bw-admin .bw-title { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.bw-admin .bw-title img { width: 32px; height: 32px; }
+
+.bw-summary { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)) minmax(260px, 1.6fr); gap: 12px; margin: 16px 0 8px; }
+.bw-card { background: #fff; border: 1px solid #c3c4c7; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.bw-num { font-size: 26px; font-weight: 600; line-height: 1; color: #0F2A3D; }
+.bw-label { color: #50575e; }
+.bw-mode form { display: flex; gap: 8px; align-items: center; }
+.bw-hint { color: #646970; }
+@media (max-width: 960px) { .bw-summary { grid-template-columns: 1fr 1fr; } }
+
+.bw-protecting { color: #50575e; max-width: 900px; }
+.bw-log { margin-top: 8px; }
+.bw-log .column-primary { width: 46%; }
+.bw-log .bw-col-why { width: 26%; }
+.bw-log .bw-col-when { width: 12%; }
+.bw-from { font-size: 14px; margin-right: 6px; }
+
+.bw-chip { display: inline-block; font-size: 11px; font-weight: 600; line-height: 1; padding: 4px 8px; border-radius: 999px; vertical-align: 1px; }
+.bw-chip-held { background: #FBE3D8; color: #B23E12; }
+.bw-chip-released { background: #DCEFF6; color: #1D5C7A; }
+.bw-chip-clean { background: #EDF2F0; color: #3E5566; }
+.bw-chip-logged { background: #F6F0D8; color: #7A5B0B; }
+
+.bw-message { margin: 6px 0 2px; }
+.bw-message summary { cursor: pointer; color: #3c434a; }
+.bw-message .bw-full { white-space: pre-wrap; margin-top: 6px; padding: 8px 10px; background: #f6f7f7; border-radius: 4px; max-height: 240px; overflow: auto; }
+.bw-admin .row-actions.visible { left: 0; padding-top: 4px; }
+.bw-release { font-weight: 600; }
+
+.bw-score { display: inline-grid; place-items: center; min-width: 24px; height: 22px; padding: 0 6px; border-radius: 4px; background: #0F2A3D; color: #fff; font-weight: 600; font-size: 12px; margin: 0 4px 4px 0; }
+.bw-reason { display: inline-block; font-size: 12px; background: #f0f0f1; border-radius: 4px; padding: 2px 7px; margin: 0 4px 4px 0; color: #3c434a; }
+.bw-muted { color: #646970; font-size: 12px; }
+.bw-noted td { background: #F2F9FC !important; }
+.bw-foot { margin-top: 12px; }
