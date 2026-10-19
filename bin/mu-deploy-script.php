@@ -15,7 +15,8 @@
  *
  * The script skips sites that aren't WordPress, run PHP older than 8.1 (the file would not
  * parse), or have the regular plugin active. It writes the file atomically, checks its sha256,
- * loads WordPress to confirm Breakwater boots, and takes the file out again if it doesn't. Each
+ * loads WordPress to confirm Breakwater boots, and takes the file out again if it doesn't. Then it
+ * purges the page cache (Kinsta, WP Rocket or LiteSpeed) so cached pages pick up the script. Each
  * site prints one line: BREAKWATER|<home>|<result>|<details>.
  */
 
@@ -42,6 +43,17 @@ mu_dir=$($WP --skip-plugins eval 'echo WPMU_PLUGIN_DIR;' 2>/dev/null)
 mu_dir=${mu_dir:-wp-content/mu-plugins}
 target="$mu_dir/breakwater.php"
 
+# Cached pages were built without (or with) Breakwater's script: purge whichever page cache the
+# site has, the way CaptainCore's update script does. Prints what it purged.
+purge_cache() {
+    local purged=""
+    $WP cache flush >/dev/null 2>&1
+    if $WP help kinsta cache >/dev/null 2>&1; then $WP kinsta cache purge --all >/dev/null 2>&1 && purged="$purged kinsta"; fi
+    if $WP help rocket clean >/dev/null 2>&1; then $WP rocket clean --confirm >/dev/null 2>&1 && purged="$purged wp-rocket"; fi
+    if $WP help litespeed-purge >/dev/null 2>&1; then $WP litespeed-purge all >/dev/null 2>&1 && purged="$purged litespeed"; fi
+    echo "${purged:- none}"
+}
+
 BASH;
 
 if ( $remove ) {
@@ -51,7 +63,7 @@ if [ ! -f "$target" ]; then
     exit 0
 fi
 rm -f "$target"
-echo "BREAKWATER|$home|removed|settings and log kept"
+echo "BREAKWATER|$home|removed|settings and log kept, cache purged:$(purge_cache)"
 
 BASH;
 } else {
@@ -101,7 +113,7 @@ mv -f "\$tmp" "\$target"
 {$set_mode}status=\$(\$WP eval 'echo defined( "BREAKWATER_FILE" ) && class_exists( "Breakwater\\\\Plugin", false ) ? Breakwater\\Plugin::VERSION . " " . Breakwater\\Plugin::mode()->value : "not-loaded";' 2>/dev/null | tail -1)
 case "\$status" in
     $version\ *)
-        echo "BREAKWATER|\$home|installed|$version \${status#* }\${previous:+ (was \$previous)}"
+        echo "BREAKWATER|\$home|installed|$version \${status#* }\${previous:+ (was \$previous)}, cache purged:\$(purge_cache)"
         ;;
     *)
         rm -f "\$target"
