@@ -8,6 +8,7 @@ use Breakwater\Checker;
 use Breakwater\Feedback;
 use Breakwater\Guard;
 use Breakwater\Log;
+use Breakwater\Release;
 use Breakwater\Submission;
 
 /**
@@ -31,48 +32,36 @@ final class GravityForms extends Adapter {
         add_filter( 'gform_abort_submission_with_confirmation', $this->checkDraft( ... ), 99, 2 );
         add_action( 'gform_entry_created', $this->link( ... ), 10, 1 );
         add_action( 'gform_post_update_entry_property', $this->statusChanged( ... ), 10, 4 );
-        add_action( 'breakwater_not_spam', $this->release( ... ) );
     }
 
     /**
-     * "Not spam" from the log or a Deliver link takes the entry out of the Spam folder; the
-     * status change then sends its notifications and feeds (statusChanged).
+     * Out of Spam, then what holding it skipped: Gravity Forms sends no notifications and runs
+     * no feeds for a spam entry, and doesn't run them when one is marked Not Spam either.
+     * Release::run() calls this once per row, also after Gravity Forms' own Not Spam.
      */
-    public function release( object $row ): bool {
+    public function release( object $row ): ?string {
         global $wpdb;
-        if ( $this->source() !== $row->source || ! class_exists( 'GFFormsModel' ) ) {
-            return false;
+        if ( ! class_exists( 'GFAPI' ) ) {
+            return null;
         }
         $entry_id = (int) $wpdb->get_var( $wpdb->prepare(
-            "SELECT m.entry_id FROM {$wpdb->prefix}gf_entry_meta m JOIN {$wpdb->prefix}gf_entry e ON e.id = m.entry_id WHERE m.meta_key = 'breakwater_log_id' AND m.meta_value = %d AND e.status = 'spam' LIMIT 1",
+            "SELECT entry_id FROM {$wpdb->prefix}gf_entry_meta WHERE meta_key = 'breakwater_log_id' AND meta_value = %d LIMIT 1",
             (int) $row->id
         ) );
-        if ( $entry_id ) {
+        $entry = $entry_id ? \GFAPI::get_entry( $entry_id ) : null;
+        $form  = is_array( $entry ) && 'trash' !== $entry['status'] ? \GFAPI::get_form( (int) $entry['form_id'] ) : null;
+        if ( ! is_array( $form ) ) {
+            return null;
+        }
+        if ( 'spam' === $entry['status'] ) {
             \GFFormsModel::update_entry_property( $entry_id, 'status', 'active' );
+            $entry['status'] = 'active';
         }
-        return (bool) ( Log::get( (int) $row->id )->delivered_at ?? false );
-    }
-
-    /**
-     * Gravity Forms skips notifications and feeds for a spam entry and doesn't run them when
-     * it is marked Not Spam, so a released entry would sit in the list unseen. Send them once,
-     * and only for an entry that was saved as spam (by us or the other spam service).
-     */
-    private function send( int $entry_id, int $log_id ): void {
-        $row = Log::get( $log_id );
-        if ( ! $row || $row->delivered_at || ( 'blocked' !== $row->action && 'spam' !== $row->other_verdict ) || ! class_exists( 'GFAPI' ) ) {
-            return;
-        }
-        $entry = \GFAPI::get_entry( $entry_id );
-        $form  = is_array( $entry ) ? \GFAPI::get_form( (int) $entry['form_id'] ) : false;
-        if ( ! is_array( $entry ) || ! is_array( $form ) ) {
-            return;
-        }
-        Log::markDelivered( $log_id );
         \GFAPI::send_notifications( $form, $entry );
         if ( method_exists( 'GFAPI', 'maybe_process_feeds' ) ) { // 2.9.2+
             \GFAPI::maybe_process_feeds( $entry, $form );
         }
+        return 'Restored to the Gravity Forms entries, and its notifications and feeds ran.';
     }
 
     public function recipients( string $form ): array {
@@ -94,18 +83,18 @@ final class GravityForms extends Adapter {
         }
     }
 
-    /** Gravity Forms' own "Not Spam" and "Spam" buttons count as feedback. */
+    /** Gravity Forms' own "Not Spam" releases it like ours does; "Spam" counts as feedback. */
     private function statusChanged( mixed $entry_id, mixed $property, mixed $value, mixed $previous ): void {
-        if ( 'status' !== $property || ! function_exists( 'gform_get_meta' ) ) {
+        if ( 'status' !== $property || Release::running() || ! function_exists( 'gform_get_meta' ) ) {
             return;
         }
         $log_id = (int) gform_get_meta( (int) $entry_id, 'breakwater_log_id' );
-        if ( ! $log_id ) {
+        $row    = $log_id ? Log::get( $log_id ) : null;
+        if ( ! $row ) {
             return;
         }
         if ( 'spam' === $previous && 'active' === $value ) {
-            $this->send( (int) $entry_id, $log_id );
-            Feedback::notSpam( $log_id );
+            Release::run( $row );
         } elseif ( 'spam' === $value && 'spam' !== $previous ) {
             Feedback::spam( $log_id );
         }

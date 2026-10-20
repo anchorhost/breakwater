@@ -36,11 +36,18 @@ abstract class Adapter {
     }
 
     /**
-     * Hand a held submission back to the plugin, so it runs what holding it skipped (its
-     * notifications, its feeds). True when that happened; otherwise Delivery emails it.
+     * Hand a held submission back to the plugin as if it had never been held: saved where the
+     * plugin saves it, with its emails and integrations run. Called once per row, through
+     * Release::run(), with the visitor's request restored. Returns what happened in a sentence
+     * for the site owner, or null when it can't, and Breakwater emails the fields instead.
      */
-    public function release( object $row ): bool {
-        return false;
+    public function release( object $row ): ?string {
+        return null;
+    }
+
+    /** Whether this adapter hands submissions back to its plugin rather than emailing them. */
+    public function handsBack(): bool {
+        return ( new \ReflectionMethod( $this, 'release' ) )->getDeclaringClass()->getName() !== self::class;
     }
 
     /**

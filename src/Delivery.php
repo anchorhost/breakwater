@@ -7,9 +7,10 @@ namespace Breakwater;
 use Breakwater\Adapters\Registry;
 
 /**
- * Releasing a stopped submission to the people who would have received it. Each one in the
- * digest carries a signed link to a confirmation page; the page's button does the sending.
- * (A plain one-click link would be "clicked" by the mail scanners that open every link.)
+ * The digest's Deliver link, and the email used when a plugin can't take a submission back.
+ * Each held submission in the digest carries a signed link to a confirmation page; the page's
+ * button releases it (Release::run). A plain one-click link would be "clicked" by the mail
+ * scanners that open every link.
  */
 final class Delivery {
 
@@ -38,13 +39,9 @@ final class Delivery {
         return array_values( array_filter( (array) apply_filters( 'breakwater_recipients', $to, $row ), 'is_email' ) );
     }
 
-    /** Send it on, and count it as "Not spam": through the plugin when it can, by email otherwise. */
-    public static function send( object $row ): bool {
+    /** The fields, emailed to the form's recipients with the sender as Reply-To. */
+    public static function email( object $row ): bool {
         $adapter = Registry::forSource( (string) $row->source );
-        if ( $adapter && $adapter->release( $row ) ) {
-            Feedback::notSpam( (int) $row->id );
-            return true;
-        }
         $payload = json_decode( (string) $row->payload, true ) ?: [];
         $lines   = [];
         foreach ( (array) ( $payload['fields'] ?? [] ) as $key => $value ) {
@@ -56,12 +53,7 @@ final class Delivery {
             . 'Page: ' . ( $payload['url'] ?? '' ) . "\n\n"
             . implode( "\n", $lines );
         $headers = $row->email && is_email( $row->email ) ? [ 'Reply-To: ' . $row->email ] : [];
-        if ( ! wp_mail( self::recipients( $row ), $subject, $body, $headers ) ) {
-            return false;
-        }
-        Log::markDelivered( (int) $row->id );
-        Feedback::notSpam( (int) $row->id );
-        return true;
+        return wp_mail( self::recipients( $row ), $subject, $body, $headers );
     }
 
     /** The digest's link: GET shows what will be sent, POST sends it. */
@@ -72,19 +64,24 @@ final class Delivery {
         if ( ! $row || ! hash_equals( self::signature( $id ), $sig ) ) {
             self::page( 'Link not valid', '<p>This link is not valid, or the submission is older than 30 days and was removed.</p>', 404 );
         }
-        $to = implode( ', ', self::recipients( $row ) );
         if ( $row->delivered_at ) {
-            self::page( 'Already delivered', '<p>This submission was already delivered to ' . esc_html( $to ) . '.</p>' );
+            self::page( 'Already delivered', '<p>' . esc_html( (string) $row->outcome ?: 'This submission was already delivered.' ) . '</p>' );
         }
         if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
-            self::send( $row )
-                ? self::page( 'Delivered', '<p>Sent to ' . esc_html( $to ) . '. Future messages from ' . esc_html( (string) $row->email ) . ' get the benefit of the doubt.</p>' )
+            $outcome = Release::run( $row );
+            null !== $outcome
+                ? self::page( 'Delivered', '<p>' . esc_html( $outcome ) . '</p><p>Future messages from ' . esc_html( (string) $row->email ?: 'this sender' ) . ' get the benefit of the doubt.</p>' )
                 : self::page( 'Not sent', '<p>The email could not be sent. Please try again later.</p>', 500 );
         }
+        $adapter = Registry::forSource( (string) $row->source );
+        $what    = $adapter && $adapter->handsBack()
+            ? 'It goes to ' . $adapter->label() . ' as if it had never been held: saved there, with the form\'s emails and integrations run.'
+            : 'It will be emailed to ' . implode( ', ', self::recipients( $row ) ) . '.';
         $html = '<p><strong>' . esc_html( (string) $row->form ) . '</strong>, ' . esc_html( (string) $row->created_at ) . ' UTC<br>From: ' . esc_html( (string) $row->email ?: 'no email given' ) . '</p>'
             . '<blockquote style="white-space:pre-wrap;border-left:3px solid #ccc;padding-left:12px">' . esc_html( mb_substr( (string) $row->excerpt, 0, 500 ) ) . '</blockquote>'
             . '<form method="post"><input type="hidden" name="id" value="' . (int) $id . '"><input type="hidden" name="sig" value="' . esc_attr( $sig ) . '">'
-            . '<p><button type="submit" class="button button-primary" style="font-size:16px;padding:8px 16px">Deliver to ' . esc_html( $to ) . '</button></p></form>';
+            . '<p>' . esc_html( $what ) . '</p>'
+            . '<p><button type="submit" class="button button-primary" style="font-size:16px;padding:8px 16px">Deliver it</button></p></form>';
         self::page( 'Deliver this message?', $html );
     }
 

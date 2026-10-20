@@ -145,8 +145,28 @@ final class Cli {
             'signals' => implode( ',', array_keys( json_decode( (string) $row->signals, true ) ?: [] ) ),
             'email'   => $row->email,
             'ip'      => $row->ip,
+            'outcome' => $row->outcome,
         ], $rows );
-        Utils\format_items( Utils\get_flag_value( $assoc, 'format', 'table' ), $items, [ 'id', 'created', 'source', 'form', 'verdict', 'action', 'other', 'score', 'signals', 'email', 'ip' ] );
+        Utils\format_items( Utils\get_flag_value( $assoc, 'format', 'table' ), $items, [ 'id', 'created', 'source', 'form', 'verdict', 'action', 'other', 'score', 'signals', 'email', 'ip', 'outcome' ] );
+    }
+
+    /**
+     * Marks a logged submission not spam and hands it back to its form, exactly as the
+     * "Not spam" link in Tools → Breakwater does.
+     *
+     * <id>
+     * : The log row, from `wp breakwater log`.
+     *
+     * @param list<string>          $args
+     * @param array<string, string> $assoc
+     */
+    public function release( array $args, array $assoc ): void {
+        $row = Log::get( (int) ( $args[0] ?? 0 ) );
+        if ( ! $row ) {
+            WP_CLI::error( 'No such log row.' );
+        }
+        $outcome = Release::run( $row );
+        null === $outcome ? WP_CLI::error( 'It could not be sent. Check the site can send mail.' ) : WP_CLI::success( $outcome );
     }
 
     /**

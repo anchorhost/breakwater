@@ -7,8 +7,8 @@ namespace Breakwater;
 use Breakwater\Adapters\Registry;
 
 /**
- * Tools → Breakwater: what was checked, what is being held, and one "Not spam" that does the
- * right thing for each form (deliver it where the form has no spam folder, restore it where it does).
+ * Tools → Breakwater: what was checked, what is being held, and one "Not spam" that hands a
+ * held submission back to its form (Release::run).
  */
 final class Admin {
 
@@ -71,12 +71,7 @@ final class Admin {
         $note = '';
         switch ( $row ? sanitize_key( (string) ( $_GET['task'] ?? '' ) ) : '' ) {
             case 'not_spam':
-                if ( self::needsDelivery( $row ) ) {
-                    $note = Delivery::send( $row ) ? 'delivered' : 'send_failed';
-                } else {
-                    Feedback::notSpam( $id );
-                    $note = Log::get( $id )?->delivered_at ? 'released' : 'restored';
-                }
+                $note = null === Release::run( $row ) ? 'send_failed' : 'released';
                 break;
             case 'is_spam':
                 Feedback::spam( $id );
@@ -85,12 +80,6 @@ final class Admin {
         }
         wp_safe_redirect( self::url( [ 'note' => $note, 'row' => $id ] ) );
         exit;
-    }
-
-    /** A stopped submission from a form with no spam folder can only be recovered by sending it on. */
-    private static function needsDelivery( object $row ): bool {
-        $adapter = Registry::forSource( (string) $row->source );
-        return 'blocked' === $row->action && ! $row->delivered_at && ! ( $adapter && $adapter->keepsSpam() );
     }
 
     private static function rowLink( object $row, string $task, string $label, string $class = '' ): string {
@@ -134,9 +123,7 @@ final class Admin {
         $note    = sanitize_key( (string) ( $_GET['note'] ?? '' ) );
         $noted   = $note_id ? Log::get( $note_id ) : null;
         $notes   = [
-            'delivered'   => 'Delivered to ' . ( $noted ? implode( ', ', Delivery::recipients( $noted ) ) : 'the form\'s recipients' ) . '. Future messages from this sender get the benefit of the doubt.',
-            'released'    => 'Marked not spam and restored to the form\'s entries, and its notifications went out. Future messages from this sender get the benefit of the doubt.',
-            'restored'    => 'Marked not spam and restored to the form\'s entries. Future messages from this sender get the benefit of the doubt.',
+            'released'    => ( $noted && $noted->outcome ? $noted->outcome : 'Marked not spam.' ) . ' Future messages from this sender get the benefit of the doubt.',
             'marked'      => 'Marked as spam.',
             'mode'        => 'Mode saved.',
             'send_failed' => 'The email could not be sent. Check the site can send mail, then try again.',
@@ -214,12 +201,12 @@ final class Admin {
                             <?php endif; ?>
                             <div class="row-actions visible">
                                 <?php if ( 'spam' === $row->verdict && 'not_spam' !== $row->feedback && ! $row->delivered_at ) : ?>
-                                    <span><?php echo self::rowLink( $row, 'not_spam', self::needsDelivery( $row ) ? 'Not spam, deliver it' : 'Not spam', 'bw-release' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+                                    <span><?php echo self::rowLink( $row, 'not_spam', 'blocked' === $row->action ? 'Not spam, deliver it' : 'Not spam', 'bw-release' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
                                 <?php elseif ( 'ham' === $row->verdict && 'spam' !== $row->feedback ) : ?>
                                     <span><?php echo self::rowLink( $row, 'is_spam', 'Was spam' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
                                 <?php endif; ?>
                                 <?php if ( $row->delivered_at ) : ?>
-                                    <span class="bw-muted">Delivered to <?php echo esc_html( implode( ', ', Delivery::recipients( $row ) ) ); ?></span>
+                                    <span class="bw-muted"><?php echo esc_html( $row->outcome ?: 'Delivered.' ); ?></span>
                                 <?php endif; ?>
                             </div>
                         </td>

@@ -17,7 +17,7 @@ $out  = $argv[1] ?? $root . '/dist/breakwater.php';
 // the registry after them. Every file in src/ must be listed (checked below).
 $order = [
 	'Mode', 'Proof', 'Verdict', 'Reputation', 'Submission', 'Challenge', 'Log', 'Trust', 'Feedback',
-	'Checker', 'Guard', 'Delivery', 'Digest', 'Assets', 'Front', 'Admin', 'Cli', 'Plugin',
+	'Checker', 'Guard', 'Delivery', 'Release', 'Digest', 'Assets', 'Front', 'Admin', 'Cli', 'Plugin',
 	'Adapters/Adapter',
 ];
 $adapters = array_map( fn ( $f ) => 'Adapters/' . basename( $f, '.php' ), glob( $root . '/src/Adapters/*.php' ) );

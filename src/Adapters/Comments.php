@@ -6,13 +6,19 @@ namespace Breakwater\Adapters;
 
 use Breakwater\Feedback;
 use Breakwater\Guard;
+use Breakwater\Log;
+use Breakwater\Release;
 use Breakwater\Submission;
 
 /**
- * Core comments posted through wp-comments-post.php. Spam lands in the Spam folder,
- * where "Not Spam" restores it as usual.
+ * Core comments posted through wp-comments-post.php. Spam lands in the Spam folder. Released
+ * (here or with WordPress's own Not Spam), it goes where WordPress would have put it: approved
+ * with the post's author told, or pending with the moderators told.
  */
 final class Comments extends Adapter {
+
+    /** What WordPress would have done without us: 1 approved, anything else pending. */
+    private static int|string $approved = 0;
 
     public function source(): string { return 'comment'; }
     public function label(): string { return 'Comments'; }
@@ -23,35 +29,42 @@ final class Comments extends Adapter {
         add_filter( 'pre_comment_approved', $this->check( ... ), 99, 2 );
         add_action( 'comment_post', $this->link( ... ), 10, 1 );
         add_action( 'transition_comment_status', $this->statusChanged( ... ), 10, 3 );
-        add_action( 'breakwater_not_spam', $this->restore( ... ) );
     }
 
-    /** "Not spam" from the log or a Deliver link also takes the comment out of Spam, into moderation. */
-    private function restore( object $row ): void {
-        if ( $this->source() !== $row->source ) {
-            return;
+    public function release( object $row ): ?string {
+        $ids = get_comments( [ 'status' => 'all', 'include_unapproved' => true, 'meta_key' => 'breakwater_log_id', 'meta_value' => (int) $row->id, 'fields' => 'ids', 'number' => 1 ] );
+        $ids = $ids ?: get_comments( [ 'status' => 'spam', 'meta_key' => 'breakwater_log_id', 'meta_value' => (int) $row->id, 'fields' => 'ids', 'number' => 1 ] );
+        $id  = (int) ( $ids[0] ?? 0 );
+        if ( ! $id || 'trash' === wp_get_comment_status( $id ) ) {
+            return null;
         }
-        $ids = get_comments( [ 'status' => 'spam', 'meta_key' => 'breakwater_log_id', 'meta_value' => (int) $row->id, 'fields' => 'ids', 'number' => 1 ] );
-        if ( $ids ) {
-            wp_set_comment_status( (int) $ids[0], 'hold' );
+        if ( '1' === (string) get_comment_meta( $id, 'breakwater_prior_approved', true ) ) {
+            wp_set_comment_status( $id, 'approve' ); // Core emails the post's author.
+            return 'Approved and published, and the post\'s author was told.';
         }
+        wp_set_comment_status( $id, 'hold' );
+        wp_new_comment_notify_moderator( $id );
+        return 'Moved to pending comments, and the moderators were told.';
     }
 
-    /** Remember which log row the saved comment came from. */
+    /** Remember which log row the saved comment came from, and where WordPress would have put it. */
     private function link( mixed $comment_id ): void {
         if ( Guard::lastLogId() ) {
             add_comment_meta( (int) $comment_id, 'breakwater_log_id', Guard::lastLogId(), true );
+            add_comment_meta( (int) $comment_id, 'breakwater_prior_approved', (string) self::$approved, true );
+            Log::link( Guard::lastLogId(), (string) $comment_id );
         }
     }
 
-    /** WordPress's own "Not Spam" and "Spam" links count as feedback. */
+    /** WordPress's own "Not Spam" releases it like ours does; "Spam" counts as feedback. */
     private function statusChanged( mixed $new, mixed $old, mixed $comment ): void {
-        $log_id = is_object( $comment ) ? (int) get_comment_meta( (int) $comment->comment_ID, 'breakwater_log_id', true ) : 0;
-        if ( ! $log_id ) {
+        $log_id = is_object( $comment ) && ! Release::running() ? (int) get_comment_meta( (int) $comment->comment_ID, 'breakwater_log_id', true ) : 0;
+        $row    = $log_id ? Log::get( $log_id ) : null;
+        if ( ! $row ) {
             return;
         }
         if ( 'spam' === $old && in_array( $new, [ 'approved', 'unapproved' ], true ) ) {
-            Feedback::notSpam( $log_id );
+            Release::run( $row );
         } elseif ( 'spam' === $new && 'spam' !== $old ) {
             Feedback::spam( $log_id );
         }
@@ -81,6 +94,7 @@ final class Comments extends Adapter {
         // The author name is not message text for comments: judge the comment and its link.
         $s->content = trim( (string) ( $comment['comment_content'] ?? '' ) . "\n" . $s->url );
         $s->other   = 'spam' === $approved;
+        self::$approved = is_int( $approved ) || is_string( $approved ) ? $approved : 0;
 
         return $this->evaluate( $s )->act ? 'spam' : $approved;
     }

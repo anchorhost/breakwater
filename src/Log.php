@@ -6,11 +6,13 @@ namespace Breakwater;
 
 /**
  * Every checked submission gets a row. Spam keeps its full payload for 30 days so a
- * false positive can always be recovered; clean submissions keep only the verdict.
+ * false positive can always be recovered; clean submissions keep only the verdict. A held
+ * submission also keeps what its adapter needs to hand it back (replay) and the plugin's own
+ * entry it saved, if any (ref), until it is released.
  */
 final class Log {
 
-    public const DB_VERSION = 4;
+    public const DB_VERSION = 5;
 
     public static function table(): string {
         global $wpdb;
@@ -48,10 +50,14 @@ final class Log {
             feedback varchar(20) NOT NULL DEFAULT '',
             digest_at datetime DEFAULT NULL,
             delivered_at datetime DEFAULT NULL,
+            outcome varchar(255) NOT NULL DEFAULT '',
+            ref varchar(64) NOT NULL DEFAULT '',
+            replay longtext NOT NULL,
             PRIMARY KEY  (id),
             KEY created_at (created_at),
             KEY ip_created (ip, created_at),
-            KEY content_hash (content_hash)
+            KEY content_hash (content_hash),
+            KEY source_ref (source, ref)
         ) {$charset};" );
         update_option( 'breakwater_db_version', self::DB_VERSION, false );
     }
@@ -78,6 +84,7 @@ final class Log {
             'bands'         => implode( ',', Reputation::bandsFor( $s ) ),
             'excerpt'       => $spam ? mb_substr( $s->content, 0, 500 ) : '',
             'payload'       => $spam ? (string) wp_json_encode( [ 'fields' => $s->fields, 'agent' => $s->agent, 'url' => self::requestUrl() ] ) : '',
+            'replay'        => '',
         ] );
         return (int) $wpdb->insert_id;
     }
@@ -169,9 +176,57 @@ final class Log {
         $wpdb->update( self::table(), [ 'feedback' => $feedback ], [ 'id' => $id ] );
     }
 
-    public static function markDelivered( int $id ): void {
+    /**
+     * Take a row for release. Only one caller wins, so a double click or a second tab can't
+     * hand the same submission back twice.
+     */
+    public static function claim( int $id ): bool {
         global $wpdb;
-        $wpdb->update( self::table(), [ 'delivered_at' => gmdate( 'Y-m-d H:i:s' ) ], [ 'id' => $id ] );
+        return 1 === (int) $wpdb->query( $wpdb->prepare( 'UPDATE ' . self::table() . ' SET delivered_at = %s WHERE id = %d AND delivered_at IS NULL', gmdate( 'Y-m-d H:i:s' ), $id ) );
+    }
+
+    /** Give a claimed row back when its release failed, so it can be tried again. */
+    public static function unclaim( int $id ): void {
+        global $wpdb;
+        $wpdb->update( self::table(), [ 'delivered_at' => null ], [ 'id' => $id ] );
+    }
+
+    /** What the release did, in a sentence for the site owner. The replay data isn't needed any more. */
+    public static function released( int $id, string $outcome ): void {
+        global $wpdb;
+        $wpdb->update( self::table(), [ 'outcome' => mb_substr( $outcome, 0, 255 ), 'replay' => '' ], [ 'id' => $id ] );
+    }
+
+    /**
+     * What an adapter needs to hand a held submission back to its plugin. Secrets must be
+     * left out by the adapter; Release::scrub() drops the usual ones.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function stash( int $id, array $data ): void {
+        global $wpdb;
+        if ( $id ) {
+            $wpdb->update( self::table(), [ 'replay' => (string) wp_json_encode( Release::scrub( $data ) ) ], [ 'id' => $id ] );
+        }
+    }
+
+    /** @return array<string, mixed> */
+    public static function replay( object $row ): array {
+        $data = json_decode( (string) ( $row->replay ?? '' ), true );
+        return is_array( $data ) ? $data : [];
+    }
+
+    /** The plugin's own entry (post, entry or comment ID) that this row was saved as. */
+    public static function link( int $id, string $ref ): void {
+        global $wpdb;
+        if ( $id && '' !== $ref ) {
+            $wpdb->update( self::table(), [ 'ref' => mb_substr( $ref, 0, 64 ) ], [ 'id' => $id ] );
+        }
+    }
+
+    public static function byRef( string $source, string $ref ): ?object {
+        global $wpdb;
+        return '' === $ref ? null : ( $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE source = %s AND ref = %s ORDER BY id DESC LIMIT 1', $source, $ref ) ) ?: null );
     }
 
     /**

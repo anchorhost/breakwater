@@ -24,6 +24,9 @@ final class Guard {
         if ( isset( self::$seen[ $key ] ) ) {
             return self::$seen[ $key ];
         }
+        if ( Release::running() ) {
+            return Verdict::clean(); // The owner said it isn't spam: a replay is never judged again.
+        }
         if ( apply_filters( 'breakwater_skip', self::trusted(), $s ) ) {
             return self::$seen[ $key ] = Verdict::clean();
         }
