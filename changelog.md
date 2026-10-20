@@ -6,6 +6,9 @@
   * Gravity Forms: restored to the entries, and its notifications and feeds run (Gravity Forms runs neither when an entry is marked Not Spam).
   * Comments: approved and the post's author told when WordPress would have approved it, otherwise pending with the moderators told.
   * WordPress and WooCommerce registration: the account is created as the form would have (WordPress's set-password email, or WooCommerce's welcome email with a set-password link). Nobody is logged in. If the email or username was taken since, it is emailed to the admin instead.
+  * Elementor Pro: saved to Elementor's submissions with the original page, time, IP and browser, and the form's actions run (email, webhooks, integrations). Forms with uploads are emailed instead.
+  * Contact Form 7: submitted again with the spam checks skipped, so Mail, Mail (2) and every after-send integration run; with Flamingo the spam message moves to the inbox (no duplicate) and Flamingo's own Not spam releases it too.
+  * WPForms: Lite sends the notifications and runs the integrations; Pro (untested) keeps held submissions as spam entries and restores them. The check now runs once WPForms has formatted the fields, so bots WPForms refuses itself are no longer logged.
   * Fluent Forms: held submissions are now kept as Spam entries (as Fluent keeps Akismet's), with no emails or integrations run. Released here or with Fluent's own status change, the entry moves to the entries and the form's emails and integrations run. Payment and registration forms are still only refused.
   * Ninja Forms: the submission goes through Ninja's own processing again, so it is saved and every action runs. Forms with uploads, card fields or payments are emailed instead.
   * Kadence: the Advanced Form runs its actions (email and integrations); the basic Form block sends its email exactly as Kadence builds it (its MailerLite and FluentCRM steps aren't run, and the result says so).
