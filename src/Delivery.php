@@ -81,7 +81,7 @@ final class Delivery {
             . '<blockquote style="white-space:pre-wrap;border-left:3px solid #ccc;padding-left:12px">' . esc_html( mb_substr( (string) $row->excerpt, 0, 500 ) ) . '</blockquote>'
             . '<form method="post"><input type="hidden" name="id" value="' . (int) $id . '"><input type="hidden" name="sig" value="' . esc_attr( $sig ) . '">'
             . '<p>' . esc_html( $what ) . '</p>'
-            . '<p><button type="submit" class="button button-primary" style="font-size:16px;padding:8px 16px">Deliver it</button></p></form>';
+            . '<p><button type="submit" class="button button-primary" style="font-size:16px;line-height:1.5;height:auto;padding:6px 18px">Deliver it</button></p></form>';
         self::page( 'Deliver this message?', $html );
     }
 

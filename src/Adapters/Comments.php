@@ -77,7 +77,7 @@ final class Comments extends Adapter {
 
     /**
      * Hook callbacks take mixed: other plugins call these filters too, and a TypeError here
-     * would take the whole comment form down.
+     * would take the whole comment form down. The comment data arrives slashed.
      *
      * @param int|string|\WP_Error $approved
      * @param array<string, mixed> $comment
@@ -92,13 +92,13 @@ final class Comments extends Adapter {
             return $approved;
         }
         $s = Submission::fromFields( $this->source(), 'post ' . (int) $comment['comment_post_ID'], [
-            [ 'type' => 'name', 'label' => 'author', 'value' => $comment['comment_author'] ?? '' ],
-            [ 'type' => 'email', 'label' => 'email', 'value' => $comment['comment_author_email'] ?? '' ],
-            [ 'type' => 'url', 'label' => 'url', 'value' => $comment['comment_author_url'] ?? '' ],
-            [ 'type' => 'textarea', 'label' => 'comment', 'value' => $comment['comment_content'] ?? '' ],
+            [ 'type' => 'name', 'label' => 'author', 'value' => wp_unslash( (string) ( $comment['comment_author'] ?? '' ) ) ],
+            [ 'type' => 'email', 'label' => 'email', 'value' => wp_unslash( (string) ( $comment['comment_author_email'] ?? '' ) ) ],
+            [ 'type' => 'url', 'label' => 'url', 'value' => wp_unslash( (string) ( $comment['comment_author_url'] ?? '' ) ) ],
+            [ 'type' => 'textarea', 'label' => 'comment', 'value' => wp_unslash( (string) ( $comment['comment_content'] ?? '' ) ) ],
         ] );
         // The author name is not message text for comments: judge the comment and its link.
-        $s->content = trim( (string) ( $comment['comment_content'] ?? '' ) . "\n" . $s->url );
+        $s->content = trim( wp_unslash( (string) ( $comment['comment_content'] ?? '' ) ) . "\n" . $s->url );
         $s->other   = 'spam' === $approved;
         self::$approved = is_int( $approved ) || is_string( $approved ) ? $approved : 0;
 
