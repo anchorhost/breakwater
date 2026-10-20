@@ -11,6 +11,9 @@
   * Kadence: the Advanced Form runs its actions (email and integrations); the basic Form block sends its email exactly as Kadence builds it (its MailerLite and FluentCRM steps aren't run, and the result says so).
   * Avada Forms: saved to the form's submissions, with its actions and notifications run and its submission count raised. Login, registration and password forms, and forms with uploads, are emailed instead.
   * Divi (4 and 5): Divi only emails, so the email is rebuilt exactly as the form builds it (recipient, subject, message pattern, Reply-To) and Divi's submit hook fires.
+  * Jetpack Forms: moved to the inbox, with its email (rendered again as not spam) and its webhooks and integrations. Jetpack's own Not spam releases it too. Jetpack deletes spam after 15 days; after that it is emailed instead.
+  * Formidable: restored from spam with the form's pending actions run; Formidable's own Not spam releases it without running the actions twice.
+  * Forminator: held submissions are now kept as spam entries (on forms that store submissions and take no payment or login) instead of refused, and release restores them and runs Forminator's emails and integrations.
 * **Sign-ups are told to wait, not to retry.** A held registration now says it was flagged for review and that an email follows if it's approved, instead of "your message was not sent". The `breakwater_message` filter gets the kind as a second argument.
 * **Divi log rows name their form.** They read "contact form" for every form because the adapter looked for a field Divi never sends; they now name the page and the form, so the digest goes to the form's own recipient.
 * **Updates from GitHub.** The regular plugin offers new releases on the Plugins screen, from `manifest.json` on `main` and the release's zip. The single-file mu-plugin leaves the updater out, and a git checkout is never updated.
