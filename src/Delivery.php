@@ -38,14 +38,18 @@ final class Delivery {
         return array_values( array_filter( (array) apply_filters( 'breakwater_recipients', $to, $row ), 'is_email' ) );
     }
 
-    /** Send it on, and count it as "Not spam". */
+    /** Send it on, and count it as "Not spam": through the plugin when it can, by email otherwise. */
     public static function send( object $row ): bool {
+        $adapter = Registry::forSource( (string) $row->source );
+        if ( $adapter && $adapter->release( $row ) ) {
+            Feedback::notSpam( (int) $row->id );
+            return true;
+        }
         $payload = json_decode( (string) $row->payload, true ) ?: [];
         $lines   = [];
         foreach ( (array) ( $payload['fields'] ?? [] ) as $key => $value ) {
             $lines[] = $key . ': ' . ( is_scalar( $value ) ? $value : wp_json_encode( $value ) );
         }
-        $adapter = Registry::forSource( (string) $row->source );
         $subject = sprintf( '[%s] %s submission (released from spam)', wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ), $adapter ? $adapter->label() : $row->source );
         $body    = "This submission was held as possible spam on {$row->created_at} UTC and has now been released.\n\n"
             . 'Form: ' . $row->form . "\n"

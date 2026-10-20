@@ -75,7 +75,7 @@ final class Admin {
                     $note = Delivery::send( $row ) ? 'delivered' : 'send_failed';
                 } else {
                     Feedback::notSpam( $id );
-                    $note = 'restored';
+                    $note = Log::get( $id )?->delivered_at ? 'released' : 'restored';
                 }
                 break;
             case 'is_spam':
@@ -135,6 +135,7 @@ final class Admin {
         $noted   = $note_id ? Log::get( $note_id ) : null;
         $notes   = [
             'delivered'   => 'Delivered to ' . ( $noted ? implode( ', ', Delivery::recipients( $noted ) ) : 'the form\'s recipients' ) . '. Future messages from this sender get the benefit of the doubt.',
+            'released'    => 'Marked not spam and restored to the form\'s entries, and its notifications went out. Future messages from this sender get the benefit of the doubt.',
             'restored'    => 'Marked not spam and restored to the form\'s entries. Future messages from this sender get the benefit of the doubt.',
             'marked'      => 'Marked as spam.',
             'mode'        => 'Mode saved.',

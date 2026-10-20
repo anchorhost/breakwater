@@ -7,11 +7,13 @@ namespace Breakwater\Adapters;
 use Breakwater\Checker;
 use Breakwater\Feedback;
 use Breakwater\Guard;
+use Breakwater\Log;
 use Breakwater\Submission;
 
 /**
  * Gravity Forms. Spam is saved as a spam entry with the reason in its notes, notifications
- * are skipped, and "Not Spam" in the entry list restores it.
+ * and feeds are skipped, and "Not Spam" (here, in the log or from the digest) restores it and
+ * sends what was skipped.
  *
  * Multi-page forms are judged once, on the final submit (gform_entry_is_spam never fires on
  * Next or Previous), with every page's fields in the entry. Save and Continue is checked too:
@@ -29,14 +31,17 @@ final class GravityForms extends Adapter {
         add_filter( 'gform_abort_submission_with_confirmation', $this->checkDraft( ... ), 99, 2 );
         add_action( 'gform_entry_created', $this->link( ... ), 10, 1 );
         add_action( 'gform_post_update_entry_property', $this->statusChanged( ... ), 10, 4 );
-        add_action( 'breakwater_not_spam', $this->restore( ... ) );
+        add_action( 'breakwater_not_spam', $this->release( ... ) );
     }
 
-    /** "Not spam" from the log or a Deliver link also takes the entry out of the Spam folder. */
-    private function restore( object $row ): void {
+    /**
+     * "Not spam" from the log or a Deliver link takes the entry out of the Spam folder; the
+     * status change then sends its notifications and feeds (statusChanged).
+     */
+    public function release( object $row ): bool {
         global $wpdb;
         if ( $this->source() !== $row->source || ! class_exists( 'GFFormsModel' ) ) {
-            return;
+            return false;
         }
         $entry_id = (int) $wpdb->get_var( $wpdb->prepare(
             "SELECT m.entry_id FROM {$wpdb->prefix}gf_entry_meta m JOIN {$wpdb->prefix}gf_entry e ON e.id = m.entry_id WHERE m.meta_key = 'breakwater_log_id' AND m.meta_value = %d AND e.status = 'spam' LIMIT 1",
@@ -44,6 +49,29 @@ final class GravityForms extends Adapter {
         ) );
         if ( $entry_id ) {
             \GFFormsModel::update_entry_property( $entry_id, 'status', 'active' );
+        }
+        return (bool) ( Log::get( (int) $row->id )->delivered_at ?? false );
+    }
+
+    /**
+     * Gravity Forms skips notifications and feeds for a spam entry and doesn't run them when
+     * it is marked Not Spam, so a released entry would sit in the list unseen. Send them once,
+     * and only for an entry that was saved as spam (by us or the other spam service).
+     */
+    private function send( int $entry_id, int $log_id ): void {
+        $row = Log::get( $log_id );
+        if ( ! $row || $row->delivered_at || ( 'blocked' !== $row->action && 'spam' !== $row->other_verdict ) || ! class_exists( 'GFAPI' ) ) {
+            return;
+        }
+        $entry = \GFAPI::get_entry( $entry_id );
+        $form  = is_array( $entry ) ? \GFAPI::get_form( (int) $entry['form_id'] ) : false;
+        if ( ! is_array( $entry ) || ! is_array( $form ) ) {
+            return;
+        }
+        Log::markDelivered( $log_id );
+        \GFAPI::send_notifications( $form, $entry );
+        if ( method_exists( 'GFAPI', 'maybe_process_feeds' ) ) { // 2.9.2+
+            \GFAPI::maybe_process_feeds( $entry, $form );
         }
     }
 
@@ -76,6 +104,7 @@ final class GravityForms extends Adapter {
             return;
         }
         if ( 'spam' === $previous && 'active' === $value ) {
+            $this->send( (int) $entry_id, $log_id );
             Feedback::notSpam( $log_id );
         } elseif ( 'spam' === $value && 'spam' !== $previous ) {
             Feedback::spam( $log_id );

@@ -36,6 +36,14 @@ abstract class Adapter {
     }
 
     /**
+     * Hand a held submission back to the plugin, so it runs what holding it skipped (its
+     * notifications, its feeds). True when that happened; otherwise Delivery emails it.
+     */
+    public function release( object $row ): bool {
+        return false;
+    }
+
+    /**
      * Who normally receives this form's submissions, for delivering a held one. Empty means
      * the site admin. $form is the log's form column ("<id>: <title>").
      *

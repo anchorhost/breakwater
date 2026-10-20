@@ -11,9 +11,10 @@ namespace Breakwater;
  */
 final class Feedback {
 
+    /** Once per row: releasing a held entry comes back here through the plugin's own hooks. */
     public static function notSpam( int $log_id ): void {
         $row = Log::get( $log_id );
-        if ( ! $row ) {
+        if ( ! $row || 'not_spam' === $row->feedback ) {
             return;
         }
         Log::setFeedback( $log_id, 'not_spam' );
