@@ -11,7 +11,7 @@ use Breakwater\Release;
 use Breakwater\Submission;
 
 /**
- * Core comments posted through wp-comments-post.php. Spam lands in the Spam folder. Released
+ * Core comments and WooCommerce product reviews posted through wp-comments-post.php. Spam lands in the Spam folder. Released
  * (here or with WordPress's own Not Spam), it goes where WordPress would have put it: approved
  * with the post's author told, or pending with the moderators told.
  */
@@ -32,10 +32,15 @@ final class Comments extends Adapter {
     }
 
     public function release( object $row ): ?string {
-        $ids = get_comments( [ 'status' => 'all', 'include_unapproved' => true, 'meta_key' => 'breakwater_log_id', 'meta_value' => (int) $row->id, 'fields' => 'ids', 'number' => 1 ] );
-        $ids = $ids ?: get_comments( [ 'status' => 'spam', 'meta_key' => 'breakwater_log_id', 'meta_value' => (int) $row->id, 'fields' => 'ids', 'number' => 1 ] );
-        $id  = (int) ( $ids[0] ?? 0 );
-        if ( ! $id || 'trash' === wp_get_comment_status( $id ) ) {
+        // The row's ref is the comment. Older rows: find it by meta, with every type asked for,
+        // since WooCommerce hides product reviews from comment queries otherwise.
+        $id = (int) $row->ref;
+        if ( ! $id || (int) get_comment_meta( $id, 'breakwater_log_id', true ) !== (int) $row->id ) {
+            $ids = get_comments( [ 'status' => 'any', 'type' => 'all', 'meta_key' => 'breakwater_log_id', 'meta_value' => (int) $row->id, 'fields' => 'ids', 'number' => 1 ] );
+            $ids = $ids ?: get_comments( [ 'status' => 'spam', 'type' => 'all', 'meta_key' => 'breakwater_log_id', 'meta_value' => (int) $row->id, 'fields' => 'ids', 'number' => 1 ] );
+            $id  = (int) ( $ids[0] ?? 0 );
+        }
+        if ( ! $id || in_array( wp_get_comment_status( $id ), [ false, 'trash' ], true ) ) {
             return null;
         }
         if ( '1' === (string) get_comment_meta( $id, 'breakwater_prior_approved', true ) ) {
@@ -81,8 +86,9 @@ final class Comments extends Adapter {
         if ( ! is_array( $comment ) || ! isset( $_POST['comment_post_ID'] ) || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || is_wp_error( $approved ) ) { // phpcs:ignore WordPress.Security.NonceVerification
             return $approved;
         }
+        // Comments, and WooCommerce product reviews (typed "review" before this filter runs).
         $type = (string) ( $comment['comment_type'] ?? '' );
-        if ( '' !== $type && 'comment' !== $type ) {
+        if ( ! in_array( $type, [ '', 'comment', 'review' ], true ) ) {
             return $approved;
         }
         $s = Submission::fromFields( $this->source(), 'post ' . (int) $comment['comment_post_ID'], [
