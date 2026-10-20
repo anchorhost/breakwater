@@ -42,30 +42,35 @@ Logged-in users who can edit posts or moderate comments are never checked (`brea
 Nothing is ever lost on CleanTalk-style servers: every held submission stays on the site.
 
 - **Daily digest.** Submissions that were stopped go out once a day to whoever receives that form's notifications (Gravity Forms notifications, CF7's mail recipient, WPForms notifications; the site admin otherwise), each with a **Deliver** link. The link opens a confirmation page whose button sends it on, so mail scanners that open links cannot deliver anything. Obvious bots (honeypot filled, no browser, forged proof of work, automated browser, script injection) are counted but not listed. Turn it off with `define( 'BREAKWATER_DIGEST', false );` or the `breakwater_digest_enabled` filter; `wp breakwater digest [--dry-run]` sends it now.
-- **"Not spam" counts, wherever it is clicked**: the Breakwater log, a Deliver link, Gravity Forms' Not Spam, or approving a spam comment. The sender is trusted on that site for a year (a -10 signal, so a bot borrowing the address still trips the honeypot or browser checks), a Gravity Forms entry or comment is taken out of Spam, and the correction is reported to the fleet so the sender leaves the shared reputation list.
-- **Released entries arrive as if never held.** Gravity Forms skips notifications and feeds for spam entries and doesn't run them when one is marked Not Spam. Breakwater sends them once when an entry it logged leaves Spam, however it was released, so the email goes out and the Mailchimp, Zapier or CRM feed runs. Forms without a spam folder are still delivered by email.
-- **Retrying is safe.** A person sending the same message again after being refused is not counted against: their own earlier attempt never feeds the repeat or busy-IP signals.
+- **"Not spam" hands it back, wherever it is clicked**: the Breakwater log, a Deliver link, the form plugin's own Not spam button, or `wp breakwater release <id>`. The submission ends up as if it had never been held: saved where the plugin saves it, with the plugin's own emails and integrations run (the table below says what that means for each). Only one click wins, a replay is never judged again, and what happened is shown and kept on the log row. When a plugin can't take it back (a deleted form, uploads, payments, an email taken since), the fields are emailed to the form's recipients instead.
+- **The sender gets the benefit of the doubt.** They are trusted on that site for a year (a -10 signal, so a bot borrowing the address still trips the honeypot or browser checks), and the correction is reported to the fleet so the sender leaves the shared reputation list.
+- **Sign-ups end in a confirmation.** A released registration or mailing-list sign-up always sends the person something to act on (a set-password link, a confirmation email). Nobody is logged in or silently subscribed.
+- **Retrying is safe.** A person sending the same message again after being refused is not counted against: their own earlier attempt never feeds the repeat or busy-IP signals. Refused sign-ups are told to wait for review instead, since a retry would find the email taken after a release.
 
 ## Integrations
 
-| Integration | Hook | Spam goes to |
+| Integration | Spam goes to | "Not spam" does |
 |---|---|---|
-| Comments | `pre_comment_approved` | The Spam folder |
-| Gravity Forms | `gform_entry_is_spam` | Spam entries, reason in the entry notes |
-| Contact Form 7 | `wpcf7_spam` | Flamingo's Spam folder when Flamingo is active |
-| Jetpack Forms | `jetpack_contact_form_is_spam` | Feedback marked spam, email skipped |
-| Formidable Forms 7+ | `frm_validate_entry` + spam source `breakwater` | Spam entries, actions and emails skipped (older: form error) |
-| Forminator | `forminator_spam_protection` | The form's spam setting: refused (default) or spam entry |
-| Constant Contact Forms | `constant_contact_maybe_spam` | Refused with its spam message, nothing sent to the API |
-| Mailchimp for WP | `mc4wp_form_errors` | Refused with "Your submission was marked as spam." |
-| Divi contact form (4 and 5) | module attributes: forces Divi's spam check to fail | Refused with Divi's "You must be a human" |
-| Avada Forms | `fusion_builder_form_submission_data` | Refused with the form's error notice, nothing saved |
-| Elementor Pro, WPForms, Ninja Forms, Fluent Forms, Kadence (Advanced and basic Form), MailPoet, Ultimate Member, WordPress and WooCommerce registration | each plugin's validation hook | Refused with a message |
+| Comments and WooCommerce product reviews | The Spam folder | Approved with the post's author told, or pending with the moderators told, as WordPress would have |
+| Gravity Forms | Spam entries, reason in the entry notes | Back to the entries, notifications sent and feeds run |
+| Contact Form 7 | Flamingo's Spam folder when Flamingo is active, refused otherwise | Submitted again without the spam check: Mail, Mail (2) and every after-send integration; Flamingo's message moves to the inbox |
+| Jetpack Forms | Feedback marked spam | Moved to the inbox, email sent, webhooks and integrations run |
+| Formidable Forms 7+ | Spam entries | Restored, and the form's pending actions run |
+| Forminator | Spam entries (refused on payment and login forms) | Restored, emails and integrations run |
+| Fluent Forms | Refused, and kept as a Spam entry | Moved to the entries, emails and integrations run |
+| Elementor Pro | Refused | Saved to Submissions, the form's actions run |
+| WPForms | Refused (Pro: spam entries) | Notifications and integrations run (Pro: restored) |
+| Ninja Forms | Refused | Processed again: saved, every action run |
+| Avada Forms | Refused | Saved to the form's submissions, actions and notifications run |
+| Kadence (Advanced and basic Form) | Refused | The form's actions run; the basic block's email is rebuilt as Kadence builds it |
+| Divi contact form (4 and 5) | Refused with Divi's "You must be a human" | The email rebuilt exactly as Divi sends it |
+| WordPress and WooCommerce registration, Ultimate Member | Refused, asked to wait for review | The account is created and the person gets a set-password email |
+| MailPoet, Mailchimp for WP | Refused, asked to wait for review | Subscribed as unconfirmed/pending, so the list asks the person to confirm |
+| Constant Contact Forms | Refused | The plugin's own steps after its spam check: notification email, contact added when they opted in |
 
-`wp breakwater integrations
-wp breakwater digest [--dry-run]` lists them and which ones are on the site. Adapters live in `src/Adapters/`, one class each, extending `Adapter` and listed in `Registry` (filter: `breakwater_adapters`).
+`wp breakwater integrations` lists them and which ones are on the site. Adapters live in `src/Adapters/`, one class each, extending `Adapter` and listed in `Registry` (filter: `breakwater_adapters`); `release()` is where an adapter hands a submission back.
 
-Every spam submission keeps its full payload in the Breakwater log (Tools → Breakwater) for 30 days. Forms without a spam folder get an "Email to admin" action, so a false positive is never lost. Passwords and card fields are redacted before anything is stored.
+Every spam submission keeps its full payload in the Breakwater log (Tools → Breakwater) for 30 days, and what its plugin needs to take it back until it is released. Passwords, card fields and captcha tokens are never stored.
 
 ## Modes
 
@@ -107,6 +112,8 @@ wp breakwater status [--days=30] [--format=json]
 wp breakwater integrations
 wp breakwater log [--verdict=spam] [--source=gravityforms] [--limit=20] [--format=json]
 wp breakwater check --content="..." --email=... [--name=...]
+wp breakwater release <id>
+wp breakwater digest [--dry-run]
 ```
 
 ## Tests
@@ -124,5 +131,7 @@ WP_PATH=/site/public FORM_ID=44 node tests/kadence.mjs https://site.localhost
 ```
 
 `tests/setup/forms-site.php` builds a form for each free plugin (Jetpack in offline mode, Ninja, Fluent, MC4WP, Formidable, Forminator, MailPoet, Constant Contact, Kadence, Ultimate Member) on a sandbox site: `wp eval-file tests/setup/forms-site.php`. The sandbox also needs MailPoet's per-IP throttle off (`mailpoet_subscription_limit_enabled`), since every test persona shares one IP. Divi and Avada are tested on their own sites with a contact form module / a `fusion_form` set to AJAX.
+
+`tests/setup/mail-log.php`, copied into a sandbox's mu-plugins, appends every `wp_mail()` to `wp-content/bw-mail.log`, which is how a release is shown to have sent its emails once.
 
 `tests/backtest/` replays the fleet's labelled submissions through the checker (see its README).
