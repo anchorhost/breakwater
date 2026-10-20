@@ -80,7 +80,7 @@ abstract class Adapter {
         return Guard::evaluate( $s );
     }
 
-    protected function message(): string {
-        return Guard::message();
+    protected function message( string $kind = 'message' ): string {
+        return Guard::message( $kind );
     }
 }

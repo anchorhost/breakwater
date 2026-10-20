@@ -49,10 +49,18 @@ final class Guard {
         return is_user_logged_in() && ( current_user_can( 'edit_posts' ) || current_user_can( 'moderate_comments' ) );
     }
 
-    public static function message(): string {
-        return (string) apply_filters(
-            'breakwater_message',
-            __( 'Your message looks like spam, so it was not sent. Please try again, or contact us another way.', 'breakwater' )
-        );
+    /**
+     * What a refused visitor is told. A held sign-up can still be approved, and trying again
+     * would then find the email taken, so sign-ups are told to wait instead.
+     *
+     * @param string $kind message, account (registration) or subscription (mailing lists).
+     */
+    public static function message( string $kind = 'message' ): string {
+        $text = match ( $kind ) {
+            'account'      => __( 'We couldn\'t create your account right away because it was flagged for review. If it\'s approved, you\'ll get an email to set your password.', 'breakwater' ),
+            'subscription' => __( 'We couldn\'t sign you up right away because it was flagged for review. If it\'s approved, you\'ll get an email to confirm.', 'breakwater' ),
+            default        => __( 'Your message looks like spam, so it was not sent. Please try again, or contact us another way.', 'breakwater' ),
+        };
+        return (string) apply_filters( 'breakwater_message', $text, $kind );
     }
 }
