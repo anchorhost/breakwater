@@ -76,6 +76,10 @@ Every spam submission keeps its full payload in the Breakwater log (Tools → Br
 
 Pin a mode fleet-wide with `define( 'BREAKWATER_MODE', 'monitor' );`.
 
+## Updates
+
+The regular plugin updates itself from GitHub: `manifest.json` on `main` names the latest version and its release zip, and WordPress offers it on the Plugins screen like any other update (auto-updates work too). The manifest is fetched at most every 12 hours. A copy running from a git checkout is never offered updates, and the single-file mu-plugin leaves the updater out entirely: it is updated by deploying a new build.
+
 ## Single-file mu-plugin
 
 For hosts deploying across many sites, Breakwater builds into one self-contained file: every class in bracketed namespace blocks, with the script, admin stylesheet, mark and disposable-domain list embedded (`src/Assets.php` serves them from the bundle instead of from files).

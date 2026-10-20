@@ -1,0 +1,16 @@
+{
+    "name": "Breakwater",
+    "slug": "breakwater",
+    "author": "<a href=\"https://anchor.host\">Anchor Hosting</a>",
+    "version": "0.2.1",
+    "download_url": "https://github.com/anchorhost/breakwater/releases/download/v0.2.1/breakwater.zip",
+    "requires": "6.0",
+    "tested": "7.1",
+    "requires_php": "8.1",
+    "last_updated": "2026-10-19 16:00:00",
+    "homepage": "https://github.com/anchorhost/breakwater",
+    "sections": {
+        "description": "Spam protection for comments, registrations and contact forms. Works on its own: no API keys, no accounts, no setup.",
+        "changelog": "See <a href=\"https://github.com/anchorhost/breakwater/blob/main/changelog.md\">changelog.md</a>."
+    }
+}

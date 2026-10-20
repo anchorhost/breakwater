@@ -25,8 +25,11 @@ $adapters = array_values( array_diff( $adapters, [ 'Adapters/Adapter', 'Adapters
 sort( $adapters );
 $order    = array_merge( $order, $adapters, [ 'Adapters/Registry' ] );
 
+// Regular plugin only. The fleet's mu-plugin is updated by redeploying it, never by itself.
+$excluded = [ 'Updater' ];
+
 $present = array_map( fn ( $f ) => substr( $f, strlen( $root . '/src/' ), -4 ), array_merge( glob( $root . '/src/*.php' ), glob( $root . '/src/Adapters/*.php' ) ) );
-$missing = array_diff( $present, $order );
+$missing = array_diff( $present, $order, $excluded );
 if ( $missing ) {
 	fwrite( STDERR, 'Not in the build order: ' . implode( ', ', $missing ) . "\n" );
 	exit( 1 );

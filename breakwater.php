@@ -41,3 +41,6 @@ spl_autoload_register( function ( $class ) {
 } );
 
 Breakwater\Plugin::boot( __FILE__ );
+
+// Updates from GitHub releases. The mu-plugin build has its own bootstrap and leaves this out.
+Breakwater\Updater::register( __FILE__ );

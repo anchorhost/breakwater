@@ -2,6 +2,7 @@
 
 ## Unreleased (0.3.0)
 
+* **Updates from GitHub.** The regular plugin offers new releases on the Plugins screen, from `manifest.json` on `main` and the release's zip. The single-file mu-plugin leaves the updater out, and a git checkout is never updated.
 * **Released Gravity Forms entries send their notifications and feeds.** Gravity Forms skips both for spam entries and doesn't run them when an entry is marked Not Spam, so a released entry sat in the list unseen. Breakwater now sends them once when an entry it logged leaves Spam, from Gravity Forms' own button, the Breakwater log or a digest Deliver link. Entries that were never held are not sent twice.
 
 ## 0.2.1 (2026-10-19)
