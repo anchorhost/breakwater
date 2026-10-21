@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Breakwater;
 
 /**
- * Every checked submission gets a row. Spam keeps its full payload for 30 days so a
- * false positive can always be recovered; clean submissions keep only the verdict. A held
+ * Every checked submission gets a row with its full payload, kept 30 days whatever the
+ * verdict: spam so a false positive can always be recovered, clean so a missed one can be
+ * read and marked, and so the verdicts can be checked against what was sent. A held
  * submission also keeps what its adapter needs to hand it back (replay) and the plugin's own
  * entry it saved, if any (ref), until it is released.
  */
@@ -82,8 +83,8 @@ final class Log {
             'content_hash'  => $s->hash(),
             'fingerprint'   => Reputation::messageFor( $s ),
             'bands'         => implode( ',', Reputation::bandsFor( $s ) ),
-            'excerpt'       => $spam ? mb_substr( $s->content, 0, 500 ) : '',
-            'payload'       => $spam ? (string) wp_json_encode( [ 'fields' => $s->fields, 'agent' => $s->agent, 'url' => self::requestUrl() ] ) : '',
+            'excerpt'       => mb_substr( $s->content, 0, 500 ),
+            'payload'       => (string) wp_json_encode( [ 'fields' => $s->fields, 'agent' => $s->agent, 'url' => self::requestUrl() ] ),
             'replay'        => '',
         ] );
         return (int) $wpdb->insert_id;
@@ -257,7 +258,6 @@ final class Log {
     public static function cleanup(): void {
         global $wpdb;
         $table = self::table();
-        $wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE verdict = 'ham' AND created_at < %s", gmdate( 'Y-m-d H:i:s', time() - 14 * DAY_IN_SECONDS ) ) );
         $wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE created_at < %s", gmdate( 'Y-m-d H:i:s', time() - 30 * DAY_IN_SECONDS ) ) );
     }
 

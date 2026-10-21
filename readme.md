@@ -73,7 +73,7 @@ Nothing is ever lost on CleanTalk-style servers: every held submission stays on 
 
 `wp breakwater integrations` lists them and which ones are on the site. Adapters live in `src/Adapters/`, one class each, extending `Adapter` and listed in `Registry` (filter: `breakwater_adapters`); `release()` is where an adapter hands a submission back.
 
-Every spam submission keeps its full payload in the Breakwater log (Tools → Breakwater) for 30 days, and what its plugin needs to take it back until it is released. Passwords, card fields and captcha tokens are never stored.
+Every checked submission, spam or clean, keeps its full payload in the Breakwater log (Tools → Breakwater) for 30 days, and a held one keeps what its plugin needs to take it back until it is released. Passwords, card fields and captcha tokens are never stored.
 
 ## Modes
 
