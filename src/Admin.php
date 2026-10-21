@@ -19,7 +19,7 @@ final class Admin {
         add_action( 'admin_enqueue_scripts', [ self::class, 'assets' ] );
         add_action( 'admin_post_breakwater_mode', [ self::class, 'saveMode' ] );
         add_action( 'admin_post_breakwater_row', [ self::class, 'rowAction' ] );
-        add_filter( 'plugin_action_links_' . plugin_basename( Plugin::file() ), [ self::class, 'actionLinks' ] );
+        add_filter( 'plugin_row_meta', [ self::class, 'rowMeta' ], 10, 2 );
     }
 
     public static function menu(): void {
@@ -33,14 +33,17 @@ final class Admin {
     }
 
     /**
-     * @param array<int|string, string> $links
+     * "View log" after "Visit plugin site", in the plugins list and the must-use list alike
+     * (a must-use plugin has no action links under its name).
+     *
+     * @param array<int|string, string> $meta
      * @return array<int|string, string>
      */
-    public static function actionLinks( mixed $links ): mixed {
-        if ( is_array( $links ) ) {
-            array_unshift( $links, '<a href="' . esc_url( self::url() ) . '">' . esc_html__( 'Log', 'breakwater' ) . '</a>' );
+    public static function rowMeta( mixed $meta, mixed $file ): mixed {
+        if ( is_array( $meta ) && $file === plugin_basename( Plugin::file() ) && current_user_can( 'manage_options' ) ) {
+            $meta[] = '<a href="' . esc_url( self::url() ) . '">' . esc_html__( 'View log', 'breakwater' ) . '</a>';
         }
-        return $links;
+        return $meta;
     }
 
     /** @param array<string, string|int> $args */
