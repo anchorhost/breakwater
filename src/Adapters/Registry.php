@@ -31,6 +31,7 @@ final class Registry {
         UltimateMember::class,
         ConstantContact::class,
         BeaverBuilder::class,
+        Breakdance::class,
     ];
 
     /** @var array<string, Adapter>|null keyed by source */
