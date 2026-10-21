@@ -108,6 +108,8 @@ php bin/mu-deploy-script.php --remove             # → dist/remove-mu.sh
 
 `remove-mu.sh` takes the file out and keeps the site's settings and log. When both the mu-plugin and the regular plugin are present, the mu-plugin loads first and the plugin stands aside.
 
+Each GitHub release carries the build as `breakwater-mu.php` with its `breakwater-mu.php.sha256`. CaptainCore's `deploy-breakwater` remote script installs it from the latest release the same way (`captaincore ssh <sites> --script=deploy-breakwater --mode=monitor --parallel=20 --label`; `--version=<tag>` pins a release, `--remove` takes it out), and puts the previous copy back if a new one doesn't boot. The `deploy-mu.sh` route is for unreleased builds.
+
 ## WP-CLI
 
 ```
