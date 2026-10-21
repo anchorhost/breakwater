@@ -2,7 +2,7 @@
 
 ## Unreleased (0.3.0)
 
-* **Clean submissions are logged in full.** The log kept only the verdict for clean submissions and dropped them after 14 days; it now keeps their message and fields for 30 days like spam, so a missed spam can be read before it is marked.
+* **Every submission is logged in full for 90 days.** The log kept only the verdict for clean submissions and dropped them after 14 days, and spam after 30. Clean submissions now keep their message and fields too, so a missed spam can be read before it is marked, and every row is kept 90 days (filter: `breakwater_keep_days`).
 * **"Not spam" hands a submission back to its form.** Wherever it is clicked (Tools → Breakwater, a digest Deliver link, or the form plugin's own button), a held submission now ends up as if it had never been held, and the result is shown and kept on the log row. Only one click wins, and a replay is never judged again. `wp breakwater release <id>` does the same from the command line.
   * Gravity Forms: restored to the entries, and its notifications and feeds run (Gravity Forms runs neither when an entry is marked Not Spam).
   * Comments: approved and the post's author told when WordPress would have approved it, otherwise pending with the moderators told.

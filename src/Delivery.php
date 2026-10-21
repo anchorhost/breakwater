@@ -62,7 +62,7 @@ final class Delivery {
         $sig = sanitize_text_field( wp_unslash( (string) ( $_REQUEST['sig'] ?? '' ) ) );
         $row = $id ? Log::get( $id ) : null;
         if ( ! $row || ! hash_equals( self::signature( $id ), $sig ) ) {
-            self::page( 'Link not valid', '<p>This link is not valid, or the submission is older than 30 days and was removed.</p>', 404 );
+            self::page( 'Link not valid', '<p>This link is not valid, or the submission is older than ' . Log::keepDays() . ' days and was removed.</p>', 404 );
         }
         if ( $row->delivered_at ) {
             self::page( 'Already delivered', '<p>' . esc_html( (string) $row->outcome ?: 'This submission was already delivered.' ) . '</p>' );

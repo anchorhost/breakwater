@@ -111,9 +111,9 @@ final class Admin {
         $view       = sanitize_key( (string) ( $_GET['verdict'] ?? 'spam' ) );
         $view       = in_array( $view, [ 'spam', 'ham', 'all' ], true ) ? $view : 'spam';
         $rows       = Log::rows( [ 'limit' => 100, 'verdict' => 'all' === $view ? '' : $view ] );
-        $counts     = Log::counts( 30 );
+        $counts     = Log::counts( Log::keepDays() );
         $agree      = [ 'agree' => 0, 'compared' => 0 ];
-        foreach ( Log::stats( 30 ) as $stat ) {
+        foreach ( Log::stats( Log::keepDays() ) as $stat ) {
             if ( '' !== $stat->other_verdict ) {
                 $agree['compared'] += (int) $stat->total;
                 $agree['agree']    += $stat->other_verdict === $stat->verdict ? (int) $stat->total : 0;
@@ -138,7 +138,7 @@ final class Admin {
             <?php endif; ?>
 
             <div class="bw-summary">
-                <div class="bw-card"><span class="bw-num"><?php echo esc_html( number_format_i18n( $counts['checked'] ) ); ?></span><span class="bw-label">checked in 30 days</span></div>
+                <div class="bw-card"><span class="bw-num"><?php echo esc_html( number_format_i18n( $counts['checked'] ) ); ?></span><span class="bw-label">checked in <?php echo esc_html( number_format_i18n( Log::keepDays() ) ); ?> days</span></div>
                 <div class="bw-card"><span class="bw-num"><?php echo esc_html( number_format_i18n( $counts['held'] ) ); ?></span><span class="bw-label">held, waiting for you</span></div>
                 <div class="bw-card"><span class="bw-num"><?php echo esc_html( number_format_i18n( $counts['released'] ) ); ?></span><span class="bw-label">marked not spam</span></div>
                 <div class="bw-card bw-mode">
@@ -224,7 +224,7 @@ final class Admin {
                 <?php endforeach; ?>
                 </tbody>
             </table>
-            <p class="bw-muted bw-foot">Held submissions are kept for 30 days, clean ones for 14. The daily digest lists new held messages to each form's recipients.</p>
+            <p class="bw-muted bw-foot">Submissions are kept for <?php echo esc_html( number_format_i18n( Log::keepDays() ) ); ?> days, held or clean. The daily digest lists new held messages to each form's recipients.</p>
         </div>
         <?php
     }

@@ -83,6 +83,6 @@ final class Digest {
         return '<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:15px;max-width:640px">'
             . '<p>These messages to ' . esc_html( (string) get_bloginfo( 'name' ) ) . ' were held as possible spam and not delivered. If one is real, use its Deliver link and it will be sent to you as usual.</p>'
             . '<table style="width:100%;border-collapse:collapse">' . $items . '</table>' . $more . $bots
-            . '<p style="color:#666;font-size:13px">Held messages are kept for 30 days. Breakwater.</p></div>';
+            . '<p style="color:#666;font-size:13px">Held messages are kept for ' . Log::keepDays() . ' days. Breakwater.</p></div>';
     }
 }

@@ -17,7 +17,7 @@ final class Cli {
      * Shows the mode, the integrations found on this site and a summary of recent verdicts.
      *
      * [--days=<days>]
-     * : How far back to count. Default 30.
+     * : How far back to count. Default: as long as the log keeps rows (90 days).
      *
      * [--format=<format>]
      * : table or json. Default table.
@@ -26,7 +26,7 @@ final class Cli {
      * @param array<string, string> $assoc
      */
     public function status( array $args, array $assoc ): void {
-        $days  = (int) Utils\get_flag_value( $assoc, 'days', 30 );
+        $days  = (int) Utils\get_flag_value( $assoc, 'days', Log::keepDays() );
         $stats = array_map( 'get_object_vars', Log::stats( $days ) );
         $info  = [
             'version'      => Plugin::VERSION,

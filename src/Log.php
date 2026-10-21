@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Breakwater;
 
 /**
- * Every checked submission gets a row with its full payload, kept 30 days whatever the
+ * Every checked submission gets a row with its full payload, kept 90 days (keepDays()) whatever the
  * verdict: spam so a false positive can always be recovered, clean so a missed one can be
  * read and marked, and so the verdicts can be checked against what was sent. A held
  * submission also keeps what its adapter needs to hand it back (replay) and the plugin's own
@@ -18,6 +18,11 @@ final class Log {
     public static function table(): string {
         global $wpdb;
         return $wpdb->prefix . 'breakwater_log';
+    }
+
+    /** How long rows are kept, in days: 90 unless the `breakwater_keep_days` filter says otherwise. */
+    public static function keepDays(): int {
+        return max( 1, (int) apply_filters( 'breakwater_keep_days', 90 ) );
     }
 
     public static function maybeInstall(): void {
@@ -258,7 +263,7 @@ final class Log {
     public static function cleanup(): void {
         global $wpdb;
         $table = self::table();
-        $wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE created_at < %s", gmdate( 'Y-m-d H:i:s', time() - 30 * DAY_IN_SECONDS ) ) );
+        $wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE created_at < %s", gmdate( 'Y-m-d H:i:s', time() - self::keepDays() * DAY_IN_SECONDS ) ) );
     }
 
     private static function requestUrl(): string {
