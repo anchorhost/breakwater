@@ -64,6 +64,9 @@ Nothing is ever lost on CleanTalk-style servers: every held submission stays on 
 | Avada Forms | Refused | Saved to the form's submissions, actions and notifications run |
 | Kadence (Advanced and basic Form) | Refused | The form's actions run; the basic block's email is rebuilt as Kadence builds it |
 | Divi contact form (4 and 5) | Refused with Divi's "You must be a human" | The email rebuilt exactly as Divi sends it |
+| Beaver Builder Contact Form | Refused with the module's error | The email sent exactly as Beaver Builder built it |
+| Beaver Builder Subscribe Form | Refused, asked to wait for review | Handed to its service: Mailchimp as pending, Email Address as usual; other services emailed |
+| Breakdance Form Builder | Refused with Breakdance's form error | The form's actions run (store submission, email, webhooks, integrations) |
 | WordPress and WooCommerce registration, Ultimate Member | Refused, asked to wait for review | The account is created and the person gets a set-password email |
 | MailPoet, Mailchimp for WP | Refused, asked to wait for review | Subscribed as unconfirmed/pending, so the list asks the person to confirm |
 | Constant Contact Forms | Refused | The plugin's own steps after its spam check: notification email, contact added when they opted in |
@@ -130,7 +133,7 @@ WP_PATH=/site/public node tests/forms.mjs https://site.localhost /page-a/ /page-
 WP_PATH=/site/public FORM_ID=44 node tests/kadence.mjs https://site.localhost
 ```
 
-`tests/setup/forms-site.php` builds a form for each free plugin (Jetpack in offline mode, Ninja, Fluent, MC4WP, Formidable, Forminator, MailPoet, Constant Contact, Kadence, Ultimate Member) on a sandbox site: `wp eval-file tests/setup/forms-site.php`. The sandbox also needs MailPoet's per-IP throttle off (`mailpoet_subscription_limit_enabled`), since every test persona shares one IP. Divi and Avada are tested on their own sites with a contact form module / a `fusion_form` set to AJAX.
+`tests/setup/forms-site.php` builds a form for each free plugin (Jetpack in offline mode, Ninja, Fluent, MC4WP, Formidable, Forminator, MailPoet, Constant Contact, Kadence, Ultimate Member) on a sandbox site: `wp eval-file tests/setup/forms-site.php`. The sandbox also needs MailPoet's per-IP throttle off (`mailpoet_subscription_limit_enabled`), since every test persona shares one IP. Divi and Avada are tested on their own sites with a contact form module / a `fusion_form` set to AJAX; Beaver Builder and Breakdance on theirs, built by `tests/setup/beaver-builder.php` and `tests/setup/breakdance.php`.
 
 `tests/setup/mail-log.php`, copied into a sandbox's mu-plugins, appends every `wp_mail()` to `wp-content/bw-mail.log`, which is how a release is shown to have sent its emails once.
 
