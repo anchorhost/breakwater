@@ -20,3 +20,30 @@ submissions: keep it local and delete it when done.
 
 "Ham" is whatever the site kept, so it includes spam CleanTalk missed: read the flagged-ham
 file before calling anything a false positive.
+
+## Word filter
+
+`words.py samples.jsonl words.jsonl` trains a SpamBayes-style word filter (words, word pairs,
+link domains and the sender's email domain, Robinson/Fisher combining) on the same labels, day by
+day, so each sample is judged by a model built only from earlier days. A word counts once 3 sites
+and 5 samples have used it. It abstains when fewer than half of a message's words are known from
+kept messages: the kept side is mostly English, so otherwise any Spanish or German message looks
+like spam. `--hash=1` runs it on hashed words, as sites would receive them (same results).
+
+`words_report.py samples.jsonl results.jsonl words.jsonl 2026-08-04 <review-dir>` compares points
+plans against the local and local + fleet baselines (two weeks of warm-up skipped).
+
+Results (2026-10-21, test window 2026-08-04 to 2026-10-19, plan "+4 at p >= .99, +2 at .95", so
+the filter alone never reaches the threshold of 5):
+
+| Gravity Forms | Spam caught | Kept entries flagged |
+|---|---|---|
+| Local checks | 8.6% | 0.3% |
+| Local + words | 40.1% | 2.2% |
+| Local + fleet | 46.9% | 2.5% |
+| Local + fleet + words | 61.6% | 3.6% |
+
+Comments: local + fleet 71.2% to 77.6%, no change in flagged approved comments. Of 80 kept
+entries the filter newly flagged, sampled at random, all 80 were spam the site had kept (SEO,
+virtual assistants, "Vantovo" traffic, product pitches). Single words without pairs only reach
+25.5% (local + words).
