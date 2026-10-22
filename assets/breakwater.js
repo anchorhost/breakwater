@@ -2,7 +2,8 @@
  * Breakwater: adds browser proof to every POST form on the page.
  *
  * - bw_url   honeypot, hidden from people and assistive tech
- * - bw_meta  time on page, clicks/taps and keys, webdriver flag
+ * - bw_meta  time on page, clicks/taps and keys, webdriver flag, and how many characters of
+ *            the message boxes were typed and how many pasted (counts only, never the text)
  * - bw_token proof of work for a challenge fetched live (never cached in the page)
  *
  * The token and meta also go in short-lived cookies, because some form plugins post their
@@ -25,6 +26,8 @@
 	var started = Date.now();
 	var touches = 0;
 	var keys = 0;
+	var typed = 0;
+	var pasted = 0;
 	carried();
 	var token = '';
 	var solving = null;
@@ -59,7 +62,22 @@
 			carry();
 		}
 	}, true );
-	document.addEventListener( 'input', remember, true );
+	document.addEventListener( 'input', function ( event ) {
+		var type = event.inputType || '';
+		if ( isMessage( event.target ) && type.indexOf( 'insert' ) === 0 && type !== 'insertFromPaste' && type !== 'insertFromDrop' ) {
+			typed += ( event.data || '' ).length || 1;
+		}
+		remember();
+	}, true );
+	document.addEventListener( 'paste', function ( event ) {
+		if ( isMessage( event.target ) && event.clipboardData ) {
+			pasted += event.clipboardData.getData( 'text' ).length;
+		}
+	}, true );
+
+	function isMessage( target ) {
+		return !! target && target.tagName === 'TEXTAREA';
+	}
 	document.addEventListener( 'focusin', function ( event ) {
 		if ( event.target && event.target.matches && event.target.matches( 'input, textarea, select' ) ) {
 			solve();
@@ -75,13 +93,15 @@
 				started = saved.s;
 				touches = saved.i;
 				keys = saved.k;
+				typed = saved.t || 0;
+				pasted = saved.p || 0;
 			}
 		} catch ( e ) {}
 	}
 
 	function carry() {
 		try {
-			sessionStorage.setItem( 'bw_carry', JSON.stringify( { s: started, i: touches, k: keys, at: Date.now() } ) );
+			sessionStorage.setItem( 'bw_carry', JSON.stringify( { s: started, i: touches, k: keys, t: typed, p: pasted, at: Date.now() } ) );
 		} catch ( e ) {}
 	}
 
@@ -99,7 +119,9 @@
 			i: touches,
 			k: keys,
 			w: navigator.webdriver ? 1 : 0,
-			v: 1
+			t: typed,
+			p: pasted,
+			v: 2
 		} );
 	}
 

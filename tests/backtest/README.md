@@ -43,6 +43,9 @@ the filter alone never reaches the threshold of 5):
 | Local + fleet | 46.9% | 2.5% |
 | Local + fleet + words | 61.6% | 3.6% |
 
+With the site-address signal (2026-10-21, `results-v3.jsonl`): local 9.6%, local + words 45.8%,
+local + fleet 48.8%, local + fleet + words 63.2% of Gravity Forms spam.
+
 Comments: local + fleet 71.2% to 77.6%, no change in flagged approved comments. Of 80 kept
 entries the filter newly flagged, sampled at random, all 80 were spam the site had kept (SEO,
 virtual assistants, "Vantovo" traffic, product pitches). Single words without pairs only reach

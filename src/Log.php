@@ -89,7 +89,7 @@ final class Log {
             'fingerprint'   => Reputation::messageFor( $s ),
             'bands'         => implode( ',', Reputation::bandsFor( $s ) ),
             'excerpt'       => mb_substr( $s->content, 0, 500 ),
-            'payload'       => (string) wp_json_encode( [ 'fields' => $s->fields, 'agent' => $s->agent, 'url' => self::requestUrl() ] ),
+            'payload'       => (string) wp_json_encode( [ 'fields' => $s->fields, 'agent' => $s->agent, 'url' => self::requestUrl(), 'meta' => $s->meta ] ),
             'replay'        => '',
         ] );
         return (int) $wpdb->insert_id;

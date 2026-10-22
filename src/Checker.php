@@ -151,6 +151,44 @@ final class Checker {
         if ( strlen( $text ) > 40 && strtoupper( $text ) === $text && preg_match( '/[A-Z]/', $text ) ) {
             $this->add( 'all_caps', 1, 'all capitals' );
         }
+
+        $address = self::siteAddress( $text, (string) wp_parse_url( home_url(), PHP_URL_HOST ), (string) get_bloginfo( 'name' ) );
+        if ( $address ) {
+            $this->add( 'site_address', $address[0], $address[1] );
+        }
+    }
+
+    /**
+     * Mail-merge outreach puts the site's address where a person would put its name: "Hello
+     * Example Com", "Hey team example.com", or a link to another site carrying it
+     * ("directoryinspector.com/example.com"). People write to a business by its name, so this is
+     * skipped when the site's name is its address. Only the strongest use counts.
+     *
+     * @return array{0:int, 1:string}|null
+     */
+    public static function siteAddress( string $text, string $host, string $site_name ): ?array {
+        $host = self::bareHost( $host );
+        if ( ! str_contains( $host, '.' ) || str_contains( strtolower( str_replace( ' ', '', $site_name ) ), $host ) ) {
+            return null;
+        }
+        $quoted = preg_quote( $host, '/' );
+        $words  = implode( '[\s.]+', array_map( fn ( string $label ): string => preg_quote( $label, '/' ), explode( '.', $host ) ) );
+        if ( preg_match( '/\b(?:hi|hello|hey|dear|good\s+(?:day|morning|afternoon|evening)|greetings)[\s,]+(?:team\s+)?(?:https?:\/\/)?(?:www\.)?' . $words . '(?![\w-])/i', $text ) ) {
+            return [ 4, 'greets the site by its address' ];
+        }
+        if ( preg_match_all( '#(?:https?://)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)[/?\#](\S*)#i', $text, $links, PREG_SET_ORDER ) ) {
+            foreach ( $links as $link ) {
+                $other = self::bareHost( $link[1] );
+                if ( $other !== $host && ! str_ends_with( $other, '.' . $host ) && preg_match( '/(?<![\w-])' . $quoted . '(?![\w-])/i', $link[2] ) ) {
+                    return [ 3, "a link to another site carrying this site's address" ];
+                }
+            }
+        }
+        $prose = (string) preg_replace( '#<[^>]+>|(?:https?://|www\.)\S+|\S+@\S+#i', ' ', $text );
+        if ( preg_match( '/(?<![\w.\/@-])' . $quoted . '(?![\w-])/i', $prose ) ) {
+            return [ 1, "names this site's address" ];
+        }
+        return null;
     }
 
     private function sender(): void {
