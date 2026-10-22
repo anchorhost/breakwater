@@ -58,7 +58,7 @@ final class Admin {
         }
         $mode = Mode::tryFrom( sanitize_key( (string) ( $_POST['mode'] ?? '' ) ) );
         if ( $mode ) {
-            update_option( Plugin::OPTION, array_merge( Plugin::settings(), [ 'mode' => $mode->value ] ) );
+            Api::setMode( $mode->value );
         }
         wp_safe_redirect( self::url( [ 'note' => 'mode' ] ) );
         exit;
@@ -92,16 +92,13 @@ final class Admin {
 
     /** @return array{0:string, 1:string} label and class of a row's status chip */
     private static function status( object $row ): array {
-        if ( 'ham' === $row->verdict ) {
-            return 'spam' === $row->feedback ? [ 'Was spam', 'held' ] : [ 'Clean', 'clean' ];
-        }
-        if ( $row->delivered_at ) {
-            return [ 'Delivered', 'released' ];
-        }
-        if ( 'not_spam' === $row->feedback ) {
-            return [ 'Not spam', 'released' ];
-        }
-        return 'blocked' === $row->action ? [ 'Held', 'held' ] : [ 'Spam, logged', 'logged' ];
+        return match ( Api::state( $row ) ) {
+            'was_spam' => [ 'Was spam', 'held' ],
+            'clean'    => [ 'Clean', 'clean' ],
+            'released' => [ $row->delivered_at ? 'Delivered' : 'Not spam', 'released' ],
+            'held'     => [ 'Held', 'held' ],
+            default    => [ 'Spam, logged', 'logged' ],
+        };
     }
 
     public static function render(): void {
@@ -203,9 +200,9 @@ final class Admin {
                                 <details class="bw-message"><summary><?php echo esc_html( wp_trim_words( $row->excerpt, 18 ) ); ?></summary><div class="bw-full"><?php echo esc_html( $row->excerpt ); ?></div></details>
                             <?php endif; ?>
                             <div class="row-actions visible">
-                                <?php if ( 'spam' === $row->verdict && 'not_spam' !== $row->feedback && ! $row->delivered_at ) : ?>
+                                <?php if ( Api::canRelease( $row ) ) : ?>
                                     <span><?php echo self::rowLink( $row, 'not_spam', 'blocked' === $row->action ? 'Not spam, deliver it' : 'Not spam', 'bw-release' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
-                                <?php elseif ( 'ham' === $row->verdict && 'spam' !== $row->feedback ) : ?>
+                                <?php elseif ( Api::canMarkSpam( $row ) ) : ?>
                                     <span><?php echo self::rowLink( $row, 'is_spam', 'Was spam' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
                                 <?php endif; ?>
                                 <?php if ( $row->delivered_at ) : ?>

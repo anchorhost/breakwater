@@ -2,6 +2,7 @@
 
 ## Unreleased (0.3.0)
 
+* **Minn Admin shows the log.** With Minn Admin installed, its Forms screen lists every checked submission with the reasons it scored, and "Not spam" there hands a held one back exactly as Tools → Breakwater does. Both build on a new `Breakwater\Api` that other admin screens can use too.
 * **Mail-merge outreach that greets the site by its address is scored.** "Hello Example Com" or "Hey team example.com" adds 4, a link to another site carrying the site's address (`directoryinspector.com/example.com`) 3, naming the address 1, only the strongest counting, and never when the site's name is its address. In the fleet backtest, 122 of 123 kept entries greeted this way were spam the site had kept, and Gravity Forms spam caught by on-site checks rose from 8.6% to 9.6% (with fleet signals, 46.9% to 48.8%).
 * **Typing and pasting are recorded.** The browser proof now counts the characters typed and pasted into message boxes (counts only, never the text), and the log keeps the browser proof with each row. Nothing is scored on it yet.
 * **"View log" sits with the plugin's details.** The Log link under the plugin's name, unusual for a must-use plugin, is now "View log" after "Visit plugin site" in both plugin lists.

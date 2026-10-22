@@ -76,6 +76,8 @@ Nothing is ever lost on CleanTalk-style servers: every held submission stays on 
 
 Every checked submission, spam or clean, keeps its full payload in the Breakwater log (Tools → Breakwater) for 90 days (filter: `breakwater_keep_days`), and a held one keeps what its plugin needs to take it back until it is released. Passwords, card fields and captcha tokens are never stored.
 
+Other admin screens build on `Breakwater\Api`: the summary (mode, counts, which integrations are on), what a log row means (held, logged, released, clean, was spam), its reasons and fields, and the same "Not spam", "Was spam" and mode changes as Tools → Breakwater, each checking the user itself (`manage_options`). The log table and its columns are readable as they are; `Api::VERSION` goes up when an answer changes shape. [Minn Admin](https://github.com/austinginder/minn-admin) uses it to show the log under Forms.
+
 ## Modes
 
 - **Automatic** (default): monitor while CleanTalk is active, protect otherwise.
