@@ -36,6 +36,18 @@ The proof of work is stateless and cache-safe: the page carries only the endpoin
 
 The proof travels in hidden fields added to the form and, as a fallback, in two first-party cookies (`bw_token`, `bw_meta`; SameSite=Lax, 12 hours). The cookies matter for form plugins that post their own payload instead of the form's inputs (Ninja Forms, Constant Contact, MailPoet).
 
+**Logged, not scored yet.** Some checks are recorded on the log row at 0 points while there is too little data to weigh them. They don't change the score or appear as reasons, but `wp breakwater log` lists them:
+
+| Signal | What it notices |
+|---|---|
+| `stale_browser` | Chrome 12 or more versions old. Over half of fleet form spam claims one; most people are within a version of current |
+| `no_fetch_metadata` | A browser that always sends `Sec-Fetch-*` on secure pages (Chrome 80+, Firefox 90+, Safari 16.4+) sent none |
+| `no_language` | No `Accept-Language`, which every browser sends |
+| `client_hints` | Chromium's client hints contradict the user agent (version, platform, mobile), name HeadlessChrome, are missing from Chrome 90+, or come from a browser that never sends them |
+| `agent_mismatch` | The page's script saw a different user agent than the server received |
+
+The headers behind them are kept with the row's payload.
+
 Logged-in users who can edit posts or moderate comments are never checked (`breakwater_skip`).
 
 ## When it gets one wrong
@@ -130,6 +142,9 @@ wp breakwater digest [--dry-run]
 # The original eight forms (Gravity Forms, CF7 + Flamingo, WPForms, Elementor Pro, comments, registration, WooCommerce)
 PLAYWRIGHT=/path/to/node_modules/playwright node tests/browser.mjs https://protect.localhost
 python3 -I tests/nojs.py https://protect.localhost
+
+# Checker cases that need no WordPress
+php tests/consistency.php
 
 # Any page with a form: fills fields by type, skips honeypots a person can't see
 WP_PATH=/site/public node tests/forms.mjs https://site.localhost /page-a/ /page-b/

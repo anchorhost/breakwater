@@ -186,7 +186,7 @@ final class Admin {
                 <?php endif; ?>
                 <?php foreach ( $rows as $row ) : ?>
                     <?php
-                    $signals = json_decode( (string) $row->signals, true ) ?: [];
+                    $signals = array_filter( json_decode( (string) $row->signals, true ) ?: [], fn ( mixed $s ): bool => is_array( $s ) && 0 !== (int) ( $s[0] ?? 0 ) );
                     uasort( $signals, fn ( array $a, array $b ): int => $b[0] <=> $a[0] );
                     $adapter = Registry::forSource( (string) $row->source );
                     [ $label, $class ] = self::status( $row );

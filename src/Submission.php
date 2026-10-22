@@ -57,6 +57,8 @@ final class Submission {
     public string $token   = '';
     /** @var array<string, mixed>|null timing and interaction counts from the script, null when it never ran */
     public ?array $meta    = null;
+    /** @var array<string, string> what the browser says about itself beyond the user agent (fetch metadata, client hints), from the submitting request */
+    public array $headers  = [];
     public string $trap    = '';
     /** The visitor came back to a form they saved earlier (the form plugin vouches for it). */
     public bool $continued = false;
@@ -167,12 +169,37 @@ final class Submission {
         $s->form   = $form;
         $s->ip     = self::ip();
         $s->agent  = substr( (string) wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ), 0, 300 );
+        $s->headers = self::headers();
         $s->trap   = is_string( $post['bw_url'] ?? null ) ? trim( $post['bw_url'] ) : '';
         // The form's own hidden fields first; the cookies cover plugins that post their own payload.
         $s->token = self::proof( $post, 'bw_token' );
         $meta     = json_decode( self::proof( $post, 'bw_meta' ), true );
         $s->meta  = is_array( $meta ) ? $meta : null;
         return $s;
+    }
+
+    /**
+     * Headers every current browser sends with a form and most HTTP libraries don't: fetch
+     * metadata (Sec-Fetch-*, secure pages only) and Chromium's client hints (Sec-CH-UA*).
+     * Read for the consistency signals and kept with the log row.
+     *
+     * @return array<string, string>
+     */
+    private static function headers(): array {
+        $out = [];
+        foreach ( [
+            'fetch_site' => 'HTTP_SEC_FETCH_SITE', 'fetch_mode' => 'HTTP_SEC_FETCH_MODE', 'fetch_dest' => 'HTTP_SEC_FETCH_DEST',
+            'ch_ua' => 'HTTP_SEC_CH_UA', 'ch_mobile' => 'HTTP_SEC_CH_UA_MOBILE', 'ch_platform' => 'HTTP_SEC_CH_UA_PLATFORM',
+            'language' => 'HTTP_ACCEPT_LANGUAGE', 'accept' => 'HTTP_ACCEPT',
+        ] as $key => $server ) {
+            if ( is_string( $_SERVER[ $server ] ?? null ) && '' !== $_SERVER[ $server ] ) {
+                $out[ $key ] = substr( (string) wp_unslash( $_SERVER[ $server ] ), 0, 200 );
+            }
+        }
+        if ( $out || isset( $_SERVER['HTTP_USER_AGENT'] ) ) {
+            $out['https'] = is_ssl() ? '1' : '0';
+        }
+        return $out;
     }
 
     /**

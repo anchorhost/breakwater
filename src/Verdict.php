@@ -42,6 +42,9 @@ final class Verdict {
         uasort( $signals, fn ( array $a, array $b ): int => $b[0] <=> $a[0] );
         $parts = [];
         foreach ( $signals as $code => $signal ) {
+            if ( 0 === (int) $signal[0] ) {
+                continue; // Logged only, not a reason.
+            }
             $parts[] = '' !== $signal[1] ? $signal[1] : (string) $code;
         }
         return implode( '; ', array_slice( $parts, 0, 4 ) );

@@ -103,7 +103,7 @@ final class Api {
     }
 
     /**
-     * Why it scored what it did, strongest first.
+     * Why it scored what it did, strongest first. Signals logged at 0 points are left out.
      *
      * @param array<string, mixed>|object $row
      * @return list<array{code:string, points:int, detail:string}>
@@ -112,7 +112,7 @@ final class Api {
         $signals = json_decode( (string) ( (object) $row )->signals, true );
         $out     = [];
         foreach ( is_array( $signals ) ? $signals : [] as $code => $signal ) {
-            if ( is_array( $signal ) ) {
+            if ( is_array( $signal ) && 0 !== (int) ( $signal[0] ?? 0 ) ) {
                 $out[] = [ 'code' => (string) $code, 'points' => (int) ( $signal[0] ?? 0 ), 'detail' => (string) ( $signal[1] ?? '' ) ];
             }
         }

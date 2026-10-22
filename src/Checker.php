@@ -24,6 +24,9 @@ final class Checker {
         'opt out', 'promote your', 'video explainer', 'ai chatbot for your website', 'virtual assistant',
     ];
 
+    /** Chrome 138 shipped 2025-06-24 (version, timestamp), and a new major version every four weeks since. */
+    private const CHROME_ANCHOR = [ 138, 1750723200 ];
+
     /** Locales written in a script other than Latin: the foreign-script signal is skipped for them. */
     private const NON_LATIN_LOCALES = '/^(ru|uk|bg|sr|mk|be|kk|zh|ja|ko|ar|fa|ur|he|th|hi|mr|ne|el)/';
 
@@ -43,6 +46,7 @@ final class Checker {
         $checker = new self( $s );
         if ( $with_browser ) {
             $checker->browser();
+            $checker->consistency();
         }
         $checker->agent();
         $checker->content();
@@ -91,6 +95,115 @@ final class Checker {
         if ( ! empty( $meta['w'] ) ) {
             $this->add( 'webdriver', 4, 'automated browser' );
         }
+    }
+
+    /**
+     * Does the browser match what its user agent claims? Logged at 0 points until the
+     * log rows show what each is worth.
+     */
+    private function consistency(): void {
+        foreach ( self::inconsistencies( $this->s->agent, $this->s->headers, $this->s->meta, time() ) as $code => $detail ) {
+            $this->add( $code, 0, $detail );
+        }
+    }
+
+    /**
+     * Where a browser's own headers or script contradict its user agent, or the version it
+     * claims is long out of date (most spam claims a Chrome a year or more old; people update).
+     *
+     * @param array<string, string>     $headers As Submission::$headers.
+     * @param array<string, mixed>|null $meta    The script's browser proof.
+     * @return array<string, string> signal code => detail
+     */
+    public static function inconsistencies( string $agent, array $headers, ?array $meta, int $now ): array {
+        $out     = [];
+        $browser = self::claimedBrowser( $agent );
+        $https   = '1' === ( $headers['https'] ?? '' );
+
+        if ( $browser && 'chromium' === $browser['engine'] ) {
+            $behind = self::CHROME_ANCHOR[0] + intdiv( $now - self::CHROME_ANCHOR[1], 28 * DAY_IN_SECONDS ) - $browser['version'];
+            if ( $behind >= 12 ) {
+                $out['stale_browser'] = sprintf( 'Chrome %d, %d versions old', $browser['version'], $behind );
+            }
+        }
+
+        // Fetch metadata: Chrome 80+, Firefox 90+, Safari 16.4+, on secure pages only.
+        $fetches = $browser && match ( $browser['engine'] ) {
+            'chromium' => $browser['version'] >= 80,
+            'gecko'    => $browser['version'] >= 90,
+            'webkit'   => $browser['version'] >= 1604,
+        };
+        if ( $https && $fetches && ! isset( $headers['fetch_mode'] ) && ! isset( $headers['fetch_site'] ) ) {
+            $out['no_fetch_metadata'] = sprintf( '%s sent no fetch metadata', $browser['name'] );
+        }
+
+        // Client hints: only Chromium sends them, and from 90 on, it always does on secure pages
+        // (Android's in-app web views aside).
+        // Every browser sends the visitor's languages; Playwright's headless Chromium doesn't.
+        if ( $https && $browser && ! isset( $headers['language'] ) ) {
+            $out['no_language'] = sprintf( 'no Accept-Language from %s', $browser['name'] );
+        }
+
+        $hints = $headers['ch_ua'] ?? '';
+        if ( str_contains( $hints, 'HeadlessChrome' ) ) {
+            $out['client_hints'] = 'client hints name HeadlessChrome';
+        } elseif ( '' !== $hints && $browser && 'chromium' !== $browser['engine'] ) {
+            $out['client_hints'] = sprintf( 'client hints from %s, which never sends them', $browser['name'] );
+        } elseif ( '' === $hints && $https && $browser && 'chromium' === $browser['engine'] && $browser['version'] >= 90 && ! str_contains( $agent, '; wv)' ) ) {
+            $out['client_hints'] = sprintf( 'no client hints from %s', $browser['name'] );
+        } elseif ( '' !== $hints && $browser ) {
+            $platform = self::platform( $agent );
+            $said     = trim( $headers['ch_platform'] ?? '', '" ' );
+            $mobile   = $headers['ch_mobile'] ?? '';
+            if ( preg_match( '/"Chromium";\s*v="(\d+)"/', $hints, $m ) && (int) $m[1] !== $browser['version'] ) {
+                $out['client_hints'] = sprintf( 'client hints say Chrome %d, the user agent %d', $m[1], $browser['version'] );
+            } elseif ( '' !== $said && '' !== $platform && strcasecmp( $said, $platform ) !== 0 ) {
+                $out['client_hints'] = sprintf( 'client hints say %s, the user agent %s', $said, $platform );
+            } elseif ( '' !== $mobile && ( '?1' === $mobile ) !== str_contains( $agent, 'Mobile' ) ) {
+                $out['client_hints'] = '?1' === $mobile ? 'client hints say mobile, the user agent desktop' : 'client hints say desktop, the user agent mobile';
+            }
+        }
+
+        // The page's script hashes navigator.userAgent; a tool that sets the header alone differs.
+        $seen = is_string( $meta['u'] ?? null ) ? $meta['u'] : '';
+        if ( '' !== $seen && '' !== $agent && strlen( $agent ) < 300 && ! hash_equals( hash( 'fnv1a32', $agent ), $seen ) ) {
+            $out['agent_mismatch'] = "the page's script saw a different user agent";
+        }
+        return $out;
+    }
+
+    /**
+     * The engine and version a user agent claims: Chromium and Gecko by major version, WebKit
+     * as major * 100 + minor (every iOS browser is WebKit, whatever it calls itself).
+     *
+     * @return array{engine:string, version:int, name:string}|null
+     */
+    public static function claimedBrowser( string $agent ): ?array {
+        if ( preg_match( '/\((?:iPhone|iPad|iPod)[^)]*? OS (\d+)_(\d+)/', $agent, $m ) ) {
+            return [ 'engine' => 'webkit', 'version' => (int) $m[1] * 100 + (int) $m[2], 'name' => 'iOS ' . $m[1] . '.' . $m[2] ];
+        }
+        if ( preg_match( '#Firefox/(\d+)#', $agent, $m ) ) {
+            return [ 'engine' => 'gecko', 'version' => (int) $m[1], 'name' => 'Firefox ' . $m[1] ];
+        }
+        if ( preg_match( '#Chrome/(\d+)#', $agent, $m ) && ! str_contains( $agent, ' Edge/' ) ) {
+            return [ 'engine' => 'chromium', 'version' => (int) $m[1], 'name' => 'Chrome ' . $m[1] ];
+        }
+        if ( preg_match( '#Version/(\d+)\.(\d+).*Safari/#', $agent, $m ) ) {
+            return [ 'engine' => 'webkit', 'version' => (int) $m[1] * 100 + (int) $m[2], 'name' => 'Safari ' . $m[1] . '.' . $m[2] ];
+        }
+        return null;
+    }
+
+    /** The platform as client hints name it, from the user agent. */
+    private static function platform( string $agent ): string {
+        return match ( true ) {
+            str_contains( $agent, 'Android' )    => 'Android',
+            str_contains( $agent, 'Windows NT' ) => 'Windows',
+            str_contains( $agent, 'CrOS' )       => 'Chrome OS',
+            str_contains( $agent, 'Macintosh' )  => 'macOS',
+            str_contains( $agent, 'Linux' )      => 'Linux',
+            default                              => '',
+        };
     }
 
     private function agent(): void {

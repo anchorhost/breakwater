@@ -2,8 +2,9 @@
  * Breakwater: adds browser proof to every POST form on the page.
  *
  * - bw_url   honeypot, hidden from people and assistive tech
- * - bw_meta  time on page, clicks/taps and keys, webdriver flag, and how many characters of
- *            the message boxes were typed and how many pasted (counts only, never the text)
+ * - bw_meta  time on page, clicks/taps and keys, webdriver flag, how many characters of the
+ *            message boxes were typed and how many pasted (counts only, never the text), and a
+ *            short hash of navigator.userAgent to compare with the header the server receives
  * - bw_token proof of work for a challenge fetched live (never cached in the page)
  *
  * The token and meta also go in short-lived cookies, because some form plugins post their
@@ -28,6 +29,7 @@
 	var keys = 0;
 	var typed = 0;
 	var pasted = 0;
+	var agent = fnv( navigator.userAgent || '' );
 	carried();
 	var token = '';
 	var solving = null;
@@ -121,8 +123,22 @@
 			w: navigator.webdriver ? 1 : 0,
 			t: typed,
 			p: pasted,
-			v: 2
+			u: agent,
+			v: 3
 		} );
+	}
+
+	// FNV-1a over the UTF-8 bytes, as PHP's hash( 'fnv1a32' ) computes it.
+	function fnv( text ) {
+		if ( ! window.TextEncoder ) {
+			return '';
+		}
+		var bytes = new TextEncoder().encode( text );
+		var h = 0x811c9dc5;
+		for ( var i = 0; i < bytes.length; i++ ) {
+			h = Math.imul( h ^ bytes[ i ], 0x01000193 ) >>> 0;
+		}
+		return ( '0000000' + h.toString( 16 ) ).slice( -8 );
 	}
 
 	function hex( buffer ) {
