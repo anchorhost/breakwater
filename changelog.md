@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (0.3.0)
+## 0.3.0 (2026-10-22)
 
 * **Fixes from the pre-release review.**
   * WPForms payment forms are checked before Stripe, Square or PayPal charge the card. A held payment was charged first.
