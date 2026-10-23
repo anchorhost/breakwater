@@ -4,6 +4,7 @@
 // Usage: node tests/multipage.mjs https://protect.localhost
 import { createRequire } from 'module';
 import { execSync, execFileSync } from 'child_process';
+import { appendFileSync } from 'fs';
 const require = createRequire( import.meta.url );
 const { chromium } = require( process.env.PLAYWRIGHT || 'playwright' );
 
@@ -79,7 +80,8 @@ async function run( browser, who, ajax, options = {} ) {
 		await context.close();
 		if ( draftCount() === drafts ) {
 			const log = lastLog();
-			return { who: options.label || who, ajax, logged: 'draft refused: ' + ( Number( log.id ) > Number( saving ) ? `${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'no log row' ), shown: '' };
+			const refused = Number( log.id ) > Number( saving );
+			return { who: options.label || who, ajax, id: refused ? Number( log.id ) : null, verdict: refused ? log.verdict : '', draft: true, logged: 'draft refused: ' + ( Number( log.id ) > Number( saving ) ? `${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'no log row' ), shown: '' };
 		}
 		// The newest draft's token, so the test needs no saved-form confirmation set up.
 		const uuid = wp( 'echo $wpdb->get_var( "SELECT uuid FROM {$wpdb->prefix}gf_draft_submissions ORDER BY date_created DESC LIMIT 1" );' );
@@ -107,7 +109,7 @@ async function report( page, context, before, who, ajax ) {
 	const log = lastLog();
 	await context.close();
 	const fresh = Number( log.id ) > Number( before );
-	return { who, ajax, logged: fresh ? `${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'NO NEW LOG ROW', shown: shown ? shown[ 0 ].trim().slice( 0, 60 ) : '' };
+	return { who, ajax, id: fresh ? Number( log.id ) : null, verdict: fresh ? log.verdict : '', logged: fresh ? `${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'NO NEW LOG ROW', shown: shown ? shown[ 0 ].trim().slice( 0, 60 ) : '' };
 }
 
 const results = [];
@@ -124,4 +126,9 @@ for ( const ajax of [ true, false ] ) {
 	results.push( await run( headless, 'human', ajax, { fast: true, resume: true, label: 'draft-bot', context: { ignoreHTTPSErrors: true } } ) );
 }
 await headless.close();
-console.table( results );
+console.table( results.map( ( { id, verdict, draft, ...row } ) => row ) );
+
+// tests/release-check.mjs reads every suite's rows from the file named by RESULTS.
+if ( process.env.RESULTS ) {
+	appendFileSync( process.env.RESULTS, results.map( ( row ) => JSON.stringify( { suite: 'multipage', site: base, ...row } ) ).join( '\n' ) + '\n' );
+}

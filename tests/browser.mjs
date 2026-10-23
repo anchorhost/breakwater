@@ -2,6 +2,7 @@
 // Usage: node tests/browser.mjs https://protect.localhost
 import { createRequire } from 'module';
 import { execSync } from 'child_process';
+import { appendFileSync } from 'fs';
 const require = createRequire( import.meta.url );
 const { chromium } = require( process.env.PLAYWRIGHT || 'playwright' );
 
@@ -62,7 +63,7 @@ async function run( browser, who, key, options = {} ) {
 	const log = lastLog();
 	await context.close();
 	const fresh = Number( log.id ) > Number( before );
-	return { who: options.label || who, form: key, logged: fresh ? `${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'NO NEW LOG ROW', shown: shown ? shown[ 0 ].trim().slice( 0, 60 ) : '' };
+	return { who: options.label || who, form: key, id: fresh ? Number( log.id ) : null, verdict: fresh ? log.verdict : '', logged: fresh ? `${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'NO NEW LOG ROW', shown: shown ? shown[ 0 ].trim().slice( 0, 60 ) : '' };
 }
 
 const browser = await chromium.launch( { args: [ '--disable-blink-features=AutomationControlled' ] } );
@@ -79,4 +80,9 @@ for ( const key of only ) {
 	results.push( await run( headless, 'human', key, { fast: true, label: 'headless-bot', context: { ignoreHTTPSErrors: true } } ) );
 }
 await headless.close();
-console.table( results );
+console.table( results.map( ( { id, verdict, ...row } ) => row ) );
+
+// tests/release-check.mjs reads every suite's rows from the file named by RESULTS.
+if ( process.env.RESULTS ) {
+	appendFileSync( process.env.RESULTS, results.map( ( row ) => JSON.stringify( { suite: 'browser', site: base, ...row } ) ).join( '\n' ) + '\n' );
+}

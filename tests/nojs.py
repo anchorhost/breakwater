@@ -71,3 +71,7 @@ for name, send in cases:
     after = json.loads(wp('breakwater', 'log', '--limit=1', '--format=json') or '[]')
     row = after[0] if after and (not before or after[0]['id'] != before[0]['id']) else None
     print(f"{name:15s}", f"{row['verdict']}/{row['action']} {row['score']} [{row['signals']}]" if row else 'NO NEW LOG ROW')
+    # tests/release-check.mjs reads every suite's rows from the file named by RESULTS.
+    if os.environ.get('RESULTS'):
+        with open(os.environ['RESULTS'], 'a') as out:
+            out.write(json.dumps({'suite': 'nojs', 'site': BASE, 'who': 'no-js-bot', 'form': name, 'id': int(row['id']) if row else None, 'verdict': row['verdict'] if row else ''}) + '\n')

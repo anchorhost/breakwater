@@ -3,6 +3,7 @@
 // Usage: WP_PATH=/site/public FORM_ID=44 node tests/kadence.mjs https://site.localhost
 import { createRequire } from 'module';
 import { execSync } from 'child_process';
+import { appendFileSync } from 'fs';
 const require = createRequire( import.meta.url );
 const { chromium } = require( process.env.PLAYWRIGHT || 'playwright' );
 
@@ -36,7 +37,8 @@ async function run( browser, who, label, fast ) {
 	const body = ( await response.text() ).replace( /<[^>]+>/g, ' ' ).replace( /\s+/g, ' ' ).slice( 0, 90 );
 	const log = lastLog();
 	await context.close();
-	return { who: label, logged: Number( log.id ) > before ? `${ log.source } ${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'NO NEW LOG ROW', response: body };
+	const fresh = Number( log.id ) > before;
+	return { who: label, id: fresh ? Number( log.id ) : null, verdict: fresh ? log.verdict : '', logged: fresh ? `${ log.source } ${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'NO NEW LOG ROW', response: body };
 }
 
 const results = [];
@@ -47,4 +49,9 @@ await browser.close();
 const headless = await chromium.launch();
 results.push( await run( headless, 'human', 'headless-bot', true ) );
 await headless.close();
-console.table( results );
+console.table( results.map( ( { id, verdict, ...row } ) => row ) );
+
+// tests/release-check.mjs reads every suite's rows from the file named by RESULTS.
+if ( process.env.RESULTS ) {
+	appendFileSync( process.env.RESULTS, results.map( ( row ) => JSON.stringify( { suite: 'kadence', site: base, ...row } ) ).join( '\n' ) + '\n' );
+}

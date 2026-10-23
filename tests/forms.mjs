@@ -5,6 +5,7 @@
 // Usage: WP_PATH=/path/to/site/public node tests/forms.mjs https://site.localhost /page-a/ /page-b/
 import { createRequire } from 'module';
 import { execSync } from 'child_process';
+import { appendFileSync } from 'fs';
 const require = createRequire( import.meta.url );
 const { chromium } = require( process.env.PLAYWRIGHT || 'playwright' );
 
@@ -153,6 +154,9 @@ async function run( browser, who, path, options = {} ) {
 	return {
 		who: label,
 		page: path,
+		id: fresh ? Number( log.id ) : null,
+		verdict: fresh ? log.verdict : '',
+		source: fresh ? log.source : '',
 		logged: fresh ? `${ log.source } ${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'NO NEW LOG ROW',
 		shown: shown.slice( 0, 70 ),
 	};
@@ -171,4 +175,9 @@ for ( const path of paths ) {
 	results.push( await run( headless, 'human', path, { fast: true, label: 'headless-bot', context: { ignoreHTTPSErrors: true } } ) );
 }
 await headless.close();
-console.table( results );
+console.table( results.map( ( { id, verdict, source, ...row } ) => row ) );
+
+// tests/release-check.mjs reads every suite's rows from the file named by RESULTS.
+if ( process.env.RESULTS ) {
+	appendFileSync( process.env.RESULTS, results.map( ( row ) => JSON.stringify( { suite: 'forms', site: base, ...row } ) ).join( '\n' ) + '\n' );
+}
