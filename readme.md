@@ -50,6 +50,10 @@ The headers behind them are kept with the row's payload.
 
 Logged-in users who can edit posts or moderate comments are never checked (`breakwater_skip`).
 
+The visitor's IP is `REMOTE_ADDR`, never a forwarded header a bot could set. Behind a proxy that doesn't restore the real address (a load balancer, Cloudflare without its IP module), every visitor shares the proxy's IPs, so give Breakwater the right one with the `breakwater_ip` filter.
+
+Deleting the plugin removes its log, settings, trusted senders and scheduled events (not when the must-use build is installed too, since that copy still uses them).
+
 ## When it gets one wrong
 
 Nothing is ever lost on CleanTalk-style servers: every held submission stays on the site.
