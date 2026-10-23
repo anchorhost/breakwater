@@ -30,6 +30,7 @@ final class Plugin {
         Log::maybeInstall();
         Admin::register();
         Delivery::register();
+        Privacy::register();
         Digest::register();
 
         add_action( 'breakwater_cleanup', [ Log::class, 'cleanup' ] );
@@ -98,9 +99,11 @@ final class Plugin {
     }
 
     /**
-     * Per-site secret, derived from the site's own salts. Never leaves the site.
+     * Per-site secret, derived from the site's own salts. Never leaves the site. Bound to the
+     * table prefix and address too: multisite subsites and WP Freighter tenants share salts.
      */
     public static function secret(): string {
-        return hash_hmac( 'sha256', 'breakwater', wp_salt( 'secure_auth' ) );
+        global $wpdb;
+        return hash_hmac( 'sha256', 'breakwater|' . $wpdb->prefix . '|' . home_url(), wp_salt( 'secure_auth' ) );
     }
 }

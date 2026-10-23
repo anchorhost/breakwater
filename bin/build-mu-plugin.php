@@ -17,7 +17,7 @@ $out  = $argv[1] ?? $root . '/dist/breakwater.php';
 // the registry after them. Every file in src/ must be listed (checked below).
 $order = [
 	'Mode', 'Proof', 'Verdict', 'Reputation', 'Submission', 'Challenge', 'Log', 'Trust', 'Feedback',
-	'Checker', 'Guard', 'Delivery', 'Release', 'Digest', 'Assets', 'Front', 'Api', 'Admin', 'Cli', 'Plugin',
+	'Checker', 'Guard', 'Delivery', 'Release', 'Digest', 'Privacy', 'Assets', 'Front', 'Api', 'Admin', 'Cli', 'Plugin',
 	'Adapters/Adapter',
 ];
 $adapters = array_map( fn ( $f ) => 'Adapters/' . basename( $f, '.php' ), glob( $root . '/src/Adapters/*.php' ) );
@@ -36,6 +36,12 @@ if ( $missing ) {
 }
 
 $version = preg_match( "/const VERSION\s*=\s*'([^']+)'/", file_get_contents( $root . '/src/Plugin.php' ), $m ) ? $m[1] : '0.0.0';
+$header  = preg_match( '/^ \* Version:\s+(\S+)/m', file_get_contents( $root . '/breakwater.php' ), $m ) ? $m[1] : '';
+$listed  = (string) ( json_decode( (string) file_get_contents( $root . '/manifest.json' ), true )['version'] ?? '' );
+if ( $version !== $header || $version !== $listed ) {
+	fwrite( STDERR, "Versions disagree: Plugin::VERSION $version, breakwater.php $header, manifest.json $listed\n" );
+	exit( 1 );
+}
 $commit  = trim( (string) shell_exec( 'git -C ' . escapeshellarg( $root ) . ' rev-parse --short HEAD 2>/dev/null' ) );
 $dirty   = trim( (string) shell_exec( 'git -C ' . escapeshellarg( $root ) . ' status --porcelain -- src assets data 2>/dev/null' ) ) !== '' ? '+changes' : '';
 

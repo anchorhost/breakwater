@@ -11,6 +11,7 @@
  * License:           MIT
  * License URI:       https://opensource.org/licenses/MIT
  * Text Domain:       breakwater
+ * Update URI:        https://github.com/anchorhost/breakwater
  */
 
 // This file stays PHP 5.6-parseable so an old PHP gets a notice instead of a fatal error.
