@@ -10,9 +10,11 @@ const { chromium } = require( process.env.PLAYWRIGHT || 'playwright' );
 const base = process.argv[ 2 ];
 const formId = process.env.FORM_ID;
 const lastLog = () => JSON.parse( execSync( `wp --path=${ process.env.WP_PATH } breakwater log --limit=1 --format=json 2>/dev/null` ).toString() || '[]' )[ 0 ] || {};
+// Unique addresses: a released spammer's address is trusted from then on, which would skew the next run.
+const stamp = Date.now().toString( 36 );
 const messages = {
-	human: [ 'Jane Smith', 'jane.smith@gmail.com', 'Hi, could you send me a quote for a 12x16 deck? We are in Lititz.' ],
-	spammer: [ 'SEO Expert', 'seo.expert@mailinator.com', 'Our SEO services and link building will rank your website on the first page of Google. https://a.xyz https://b.xyz https://c.xyz' ],
+	human: [ 'Jane Smith', `jane.smith+${ stamp }@gmail.com`, 'Hi, could you send me a quote for a 12x16 deck? We are in Lititz.' ],
+	spammer: [ 'SEO Expert', `seo.expert+${ stamp }@mailinator.com`, 'Our SEO services and link building will rank your website on the first page of Google. https://a.xyz https://b.xyz https://c.xyz' ],
 };
 
 async function run( browser, who, label, fast ) {
