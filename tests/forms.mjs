@@ -162,17 +162,30 @@ async function run( browser, who, path, options = {} ) {
 	};
 }
 
+// One retry (Cove can restart PHP mid-run), then the error is recorded instead of ending the suite.
+async function attempt( fn, row ) {
+	for ( let i = 0; ; i++ ) {
+		try {
+			return await fn();
+		} catch ( error ) {
+			if ( i ) {
+				return { ...row, id: null, verdict: '', error: error.message.split( '\n' )[ 0 ] };
+			}
+		}
+	}
+}
+
 const results = [];
 const browser = await chromium.launch( { args: [ '--disable-blink-features=AutomationControlled' ] } );
 for ( const path of paths ) {
-	results.push( await run( browser, 'human', path ) );
-	results.push( await run( browser, 'spammer', path ) );
+	results.push( await attempt( () => run( browser, 'human', path ), { who: 'human', page: path } ) );
+	results.push( await attempt( () => run( browser, 'spammer', path ), { who: 'spammer', page: path } ) );
 }
 await browser.close();
 // A bot driving stock headless Chromium, filling instantly with an innocent message.
 const headless = await chromium.launch();
 for ( const path of paths ) {
-	results.push( await run( headless, 'human', path, { fast: true, label: 'headless-bot', context: { ignoreHTTPSErrors: true } } ) );
+	results.push( await attempt( () => run( headless, 'human', path, { fast: true, label: 'headless-bot', context: { ignoreHTTPSErrors: true } } ), { who: 'headless-bot', page: path } ) );
 }
 await headless.close();
 console.table( results.map( ( { id, verdict, source, ...row } ) => row ) );

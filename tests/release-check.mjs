@@ -121,13 +121,15 @@ for ( const site of SITES.filter( ( s ) => ! only.length || only.includes( s.key
 			const want = EXPECT[ row.who ];
 			const where = row.form || row.page || ( row.ajax === undefined ? row.suite : `gf multi-page ${ row.ajax ? 'ajax' : 'post' }` );
 			let result = row.verdict === want ? 'ok' : 'FAIL';
-			if ( ! row.id && want === 'spam' ) {
+			if ( row.error ) {
+				result = 'FAIL';
+			} else if ( ! row.id && want === 'spam' ) {
 				result = 'ok (refused by the form itself)';
 			} else if ( result === 'FAIL' && row.who === 'spammer' && SIGNUPS.includes( where ) ) {
 				result = 'ok (only an email to judge)';
 			}
 			if ( result === 'FAIL' ) {
-				problems.push( `${ site.host } ${ where }: ${ row.who } should be ${ want }, got ${ row.verdict || 'no log row' }` );
+				problems.push( `${ site.host } ${ where }: ${ row.who } ${ row.error ? `failed: ${ row.error }` : `should be ${ want }, got ${ row.verdict || 'no log row' }` }` );
 			}
 			// "Not spam" on what a spammer sent: the form plugin must take it back.
 			let released = '';

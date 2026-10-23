@@ -41,13 +41,26 @@ async function run( browser, who, label, fast ) {
 	return { who: label, id: fresh ? Number( log.id ) : null, verdict: fresh ? log.verdict : '', logged: fresh ? `${ log.source } ${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'NO NEW LOG ROW', response: body };
 }
 
+// One retry (Cove can restart PHP mid-run), then the error is recorded instead of ending the suite.
+async function attempt( fn, row ) {
+	for ( let i = 0; ; i++ ) {
+		try {
+			return await fn();
+		} catch ( error ) {
+			if ( i ) {
+				return { ...row, id: null, verdict: '', error: error.message.split( '\n' )[ 0 ] };
+			}
+		}
+	}
+}
+
 const results = [];
 const browser = await chromium.launch( { args: [ '--disable-blink-features=AutomationControlled' ] } );
-results.push( await run( browser, 'human', 'human' ) );
-results.push( await run( browser, 'spammer', 'spammer' ) );
+results.push( await attempt( () => run( browser, 'human', 'human' ), { who: 'human' } ) );
+results.push( await attempt( () => run( browser, 'spammer', 'spammer' ), { who: 'spammer' } ) );
 await browser.close();
 const headless = await chromium.launch();
-results.push( await run( headless, 'human', 'headless-bot', true ) );
+results.push( await attempt( () => run( headless, 'human', 'headless-bot', true ), { who: 'headless-bot' } ) );
 await headless.close();
 console.table( results.map( ( { id, verdict, ...row } ) => row ) );
 

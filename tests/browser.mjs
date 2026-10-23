@@ -66,18 +66,31 @@ async function run( browser, who, key, options = {} ) {
 	return { who: options.label || who, form: key, id: fresh ? Number( log.id ) : null, verdict: fresh ? log.verdict : '', logged: fresh ? `${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'NO NEW LOG ROW', shown: shown ? shown[ 0 ].trim().slice( 0, 60 ) : '' };
 }
 
+// One retry (Cove can restart PHP mid-run), then the error is recorded instead of ending the suite.
+async function attempt( fn, row ) {
+	for ( let i = 0; ; i++ ) {
+		try {
+			return await fn();
+		} catch ( error ) {
+			if ( i ) {
+				return { ...row, id: null, verdict: '', error: error.message.split( '\n' )[ 0 ] };
+			}
+		}
+	}
+}
+
 const browser = await chromium.launch( { args: [ '--disable-blink-features=AutomationControlled' ] } );
 const only = process.env.ONLY ? process.env.ONLY.split( ',' ) : Object.keys( forms );
 const results = [];
 for ( const key of only ) {
-	results.push( await run( browser, 'human', key ) );
-	results.push( await run( browser, 'spammer', key ) );
+	results.push( await attempt( () => run( browser, 'human', key ), { who: 'human', form: key } ) );
+	results.push( await attempt( () => run( browser, 'spammer', key ), { who: 'spammer', form: key } ) );
 }
 await browser.close();
 // A bot driving stock headless Chromium, filling instantly.
 const headless = await chromium.launch();
 for ( const key of only ) {
-	results.push( await run( headless, 'human', key, { fast: true, label: 'headless-bot', context: { ignoreHTTPSErrors: true } } ) );
+	results.push( await attempt( () => run( headless, 'human', key, { fast: true, label: 'headless-bot', context: { ignoreHTTPSErrors: true } } ), { who: 'headless-bot', form: key } ) );
 }
 await headless.close();
 console.table( results.map( ( { id, verdict, ...row } ) => row ) );

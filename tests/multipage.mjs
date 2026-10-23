@@ -112,18 +112,31 @@ async function report( page, context, before, who, ajax ) {
 	return { who, ajax, id: fresh ? Number( log.id ) : null, verdict: fresh ? log.verdict : '', logged: fresh ? `${ log.verdict }/${ log.action } ${ log.score } [${ log.signals }]` : 'NO NEW LOG ROW', shown: shown ? shown[ 0 ].trim().slice( 0, 60 ) : '' };
 }
 
+// One retry (Cove can restart PHP mid-run), then the error is recorded instead of ending the suite.
+async function attempt( fn, row ) {
+	for ( let i = 0; ; i++ ) {
+		try {
+			return await fn();
+		} catch ( error ) {
+			if ( i ) {
+				return { ...row, id: null, verdict: '', error: error.message.split( '\n' )[ 0 ] };
+			}
+		}
+	}
+}
+
 const results = [];
 const browser = await chromium.launch( { args: [ '--disable-blink-features=AutomationControlled' ] } );
 for ( const ajax of [ true, false ] ) {
-	results.push( await run( browser, 'human', ajax ) );
-	results.push( await run( browser, 'human', ajax, { resume: true, label: 'resumed' } ) );
-	results.push( await run( browser, 'spammer', ajax ) );
+	results.push( await attempt( () => run( browser, 'human', ajax ), { who: 'human', ajax } ) );
+	results.push( await attempt( () => run( browser, 'human', ajax, { resume: true, label: 'resumed' } ), { who: 'resumed', ajax } ) );
+	results.push( await attempt( () => run( browser, 'spammer', ajax ), { who: 'spammer', ajax } ) );
 }
 await browser.close();
 const headless = await chromium.launch();
 for ( const ajax of [ true, false ] ) {
-	results.push( await run( headless, 'human', ajax, { fast: true, label: 'headless-bot', context: { ignoreHTTPSErrors: true } } ) );
-	results.push( await run( headless, 'human', ajax, { fast: true, resume: true, label: 'draft-bot', context: { ignoreHTTPSErrors: true } } ) );
+	results.push( await attempt( () => run( headless, 'human', ajax, { fast: true, label: 'headless-bot', context: { ignoreHTTPSErrors: true } } ), { who: 'headless-bot', ajax } ) );
+	results.push( await attempt( () => run( headless, 'human', ajax, { fast: true, resume: true, label: 'draft-bot', context: { ignoreHTTPSErrors: true } } ), { who: 'draft-bot', ajax } ) );
 }
 await headless.close();
 console.table( results.map( ( { id, verdict, draft, ...row } ) => row ) );
