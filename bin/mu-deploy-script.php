@@ -39,7 +39,7 @@ if [ ! -f wp-config.php ]; then
 fi
 WP="wp --skip-themes"
 home=$($WP --skip-plugins option get home 2>/dev/null)
-mu_dir=$($WP --skip-plugins eval 'echo WPMU_PLUGIN_DIR;' 2>/dev/null)
+mu_dir=$($WP --skip-plugins eval 'echo WPMU_PLUGIN_DIR;' 2>/dev/null | tail -1)
 mu_dir=${mu_dir:-wp-content/mu-plugins}
 target="$mu_dir/breakwater.php"
 
@@ -63,6 +63,8 @@ if [ ! -f "$target" ]; then
     exit 0
 fi
 rm -f "$target"
+# A must-use plugin has no deactivation hook: its daily events would stay scheduled with nothing to run.
+$WP cron event delete breakwater_cleanup breakwater_digest >/dev/null 2>&1
 echo "BREAKWATER|$home|removed|settings and log kept, cache purged:$(purge_cache)"
 
 BASH;
@@ -96,7 +98,7 @@ if \$WP --skip-plugins plugin is-active breakwater >/dev/null 2>&1; then
     exit 0
 fi
 mkdir -p "\$mu_dir"
-tmp="\$mu_dir/.breakwater.php.tmp"
+tmp=\$(mktemp "\$mu_dir/.breakwater.XXXXXX")
 cat > "\$tmp" <<'BREAKWATER_MU_PLUGIN_EOF'
 $code
 BREAKWATER_MU_PLUGIN_EOF
@@ -108,16 +110,28 @@ if [ "\$(php -r 'echo hash_file( "sha256", \$argv[1] );' "\$tmp")" != "$sha" ]; 
     exit 0
 fi
 previous=""
-[ -f "\$target" ] && previous=\$(grep -m1 ' \\* Version:' "\$target" | awk '{print \$NF}')
+backup="\$mu_dir/.breakwater.php.previous"
+rm -f "\$backup"
+if [ -f "\$target" ]; then
+    previous=\$(grep -m1 ' \\* Version:' "\$target" | awk '{print \$NF}')
+    cp -p "\$target" "\$backup"
+fi
+chmod 644 "\$tmp"
 mv -f "\$tmp" "\$target"
 {$set_mode}status=\$(\$WP eval 'echo defined( "BREAKWATER_FILE" ) && class_exists( "Breakwater\\\\Plugin", false ) ? Breakwater\\Plugin::VERSION . " " . Breakwater\\Plugin::mode()->value : "not-loaded";' 2>/dev/null | tail -1)
 case "\$status" in
     $version\ *)
+        rm -f "\$backup"
         echo "BREAKWATER|\$home|installed|$version \${status#* }\${previous:+ (was \$previous)}, cache purged:\$(purge_cache)"
         ;;
     *)
-        rm -f "\$target"
-        echo "BREAKWATER|\$home|failed|did not load (\${status:-fatal}), removed"
+        if [ -f "\$backup" ]; then
+            mv -f "\$backup" "\$target"
+            echo "BREAKWATER|\$home|failed|did not load (\${status:-fatal}), \$previous put back"
+        else
+            rm -f "\$target"
+            echo "BREAKWATER|\$home|failed|did not load (\${status:-fatal}), removed"
+        fi
         ;;
 esac
 
