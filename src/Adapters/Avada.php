@@ -208,6 +208,11 @@ final class Avada extends Adapter {
         if ( ! is_array( $data ) || ! is_array( $data['data'] ?? null ) || Release::running() ) {
             return $data;
         }
+        $form_id = absint( $_POST['form_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification
+        $meta    = class_exists( 'Fusion_Builder_Form_Helper' ) ? \Fusion_Builder_Form_Helper::fusion_form_get_form_meta( $form_id ) : [];
+        if ( array_intersect( [ 'login', 'lost_password', 'reset_password' ], (array) ( $meta['form_actions'] ?? [] ) ) ) {
+            return $data; // A member logging in or resetting a password is never held.
+        }
         $fields = [];
         $trap   = '';
         foreach ( $data['data'] as $name => $value ) {
@@ -218,7 +223,6 @@ final class Avada extends Adapter {
             }
             $fields[] = [ 'type' => $type, 'label' => (string) ( $data['field_labels'][ $name ] ?? $name ), 'value' => $value, 'key' => (string) $name ];
         }
-        $form_id = absint( $_POST['form_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification
         $s       = Submission::fromFields( $this->source(), $form_id . ': ' . get_the_title( $form_id ), $fields );
         if ( '' !== $trap ) {
             $s->trap = $trap;
@@ -242,9 +246,10 @@ final class Avada extends Adapter {
         if ( ! $log_id || array_intersect( self::AUTH, (array) ( $meta['form_actions'] ?? [] ) ) ) {
             return;
         }
+        $types        = (array) ( $data['field_types'] ?? [] );
         $data['data'] = array_filter(
             $data['data'],
-            fn ( mixed $key ): bool => ! preg_match( '/^(fusion-form-nonce-|g-recaptcha-response|fusion-form-recaptcha-response|cf-turnstile-response|h-captcha-response)/', (string) $key ),
+            fn ( mixed $key ): bool => 'password' !== ( $types[ $key ] ?? '' ) && ! preg_match( '/^(fusion-form-nonce-|g-recaptcha-response|fusion-form-recaptcha-response|cf-turnstile-response|h-captcha-response)/', (string) $key ),
             ARRAY_FILTER_USE_KEY
         );
         $args = [];

@@ -173,6 +173,9 @@ final class Forminator extends Adapter {
         if ( $is_spam || 'form' !== $form_type || ! is_array( $rows ) ) {
             return $is_spam;
         }
+        if ( class_exists( 'Forminator_Front_Action' ) && 'login' === ( \Forminator_Front_Action::$module_settings['form-type'] ?? '' ) ) {
+            return $is_spam; // A member logging in is never held.
+        }
         // phpcs:ignore WordPress.Security.NonceVerification
         if ( filter_var( $_POST['save_draft'] ?? false, FILTER_VALIDATE_BOOLEAN ) || ! empty( $_POST['abandoned_form'] ) ) {
             return $is_spam; // Draft saves and abandonment pings are not submissions.

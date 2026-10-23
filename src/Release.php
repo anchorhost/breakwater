@@ -33,8 +33,13 @@ final class Release {
             return 'Marked not spam.';
         }
         if ( ! Log::claim( $id ) ) {
-            Feedback::notSpam( $id );
-            return (string) ( Log::get( $id )->outcome ?? '' ) ?: 'It was already delivered.';
+            // Another request has it. Its outcome is set only once the release worked; until then
+            // it may still fail and give the row back, so nothing is marked here.
+            $outcome = (string) ( Log::get( $id )->outcome ?? '' );
+            if ( '' !== $outcome ) {
+                Feedback::notSpam( $id );
+            }
+            return $outcome ?: 'It is already being delivered.';
         }
         $row     = Log::get( $id ) ?? $row;
         $adapter = Registry::forSource( (string) $row->source );
@@ -46,7 +51,13 @@ final class Release {
                 error_log( sprintf( 'Breakwater: handing back log row %d to %s failed: %s', $id, $adapter->label(), $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions
             }
         }
-        if ( null === $outcome && 'blocked' === $row->action ) {
+        if ( null === $outcome && 'blocked' !== $row->action ) {
+            // Held only by the other spam service and nothing handed it back: not delivered, but noted.
+            Log::unclaim( $id );
+            Feedback::notSpam( $id );
+            return 'Marked not spam.';
+        }
+        if ( null === $outcome ) {
             $outcome = Delivery::email( $row ) ? 'Emailed to ' . implode( ', ', Delivery::recipients( $row ) ) . '.' : null;
             if ( null === $outcome ) {
                 Log::unclaim( $id );

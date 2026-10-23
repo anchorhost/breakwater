@@ -109,8 +109,8 @@ final class GravityForms extends Adapter {
             return $is_spam;
         }
         $form_id = (int) ( $form['id'] ?? 0 );
-        if ( ! $form_id || ! isset( $_POST[ 'is_submit_' . $form_id ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-            return (bool) $is_spam; // Entries created from code or the REST API.
+        if ( ! $form_id || ! self::visitor( $form_id ) ) {
+            return (bool) $is_spam;
         }
         $s            = Submission::fromFields( $this->source(), $form_id . ': ' . ( $form['title'] ?? '' ), self::fields( $form, $entry ) );
         $s->other     = (bool) $is_spam;
@@ -134,13 +134,42 @@ final class GravityForms extends Adapter {
      */
     private function checkDraft( mixed $abort, mixed $form ): mixed {
         $form_id = is_array( $form ) ? (int) ( $form['id'] ?? 0 ) : 0;
-        if ( $abort || ! $form_id || empty( $_POST['gform_save'] ) || ! isset( $_POST[ 'is_submit_' . $form_id ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+        if ( $abort || ! $form_id || empty( $_POST['gform_save'] ) || ! self::visitor( $form_id ) ) { // phpcs:ignore WordPress.Security.NonceVerification
             return $abort;
         }
-        $s            = Submission::fromRequest( $this->source(), $form_id . ': ' . ( $form['title'] ?? '' ) . ' (saved draft)' );
+        // Typed by field, so password and card inputs (all named input_N) are redacted.
+        $s            = Submission::fromFields( $this->source(), $form_id . ': ' . ( $form['title'] ?? '' ) . ' (saved draft)', self::fields( $form, self::posted( $form ) ) );
         $s->continued = self::resumed( $form_id );
         $verdict      = $this->evaluate( $s );
         return $verdict->act && array_intersect( Checker::CERTAIN, array_keys( $verdict->signals ) ) ? true : $abort;
+    }
+
+    /**
+     * A visitor sending the form. GFAPI::submit_form() sets is_submit_ too, so entries made from
+     * code (WP-CLI, cron, the REST API and its validation endpoint) are told apart by context.
+     */
+    private static function visitor( int $form_id ): bool {
+        return isset( $_POST[ 'is_submit_' . $form_id ] ) // phpcs:ignore WordPress.Security.NonceVerification
+            && ! wp_doing_cron() && ! ( defined( 'WP_CLI' ) && WP_CLI ) && ! ( defined( 'REST_REQUEST' ) && REST_REQUEST );
+    }
+
+    /**
+     * The posted values keyed as an entry is ('3', '1.3'), from inputs named input_3 and input_1_3.
+     *
+     * @param array<string, mixed> $form
+     * @return array<string, mixed>
+     */
+    private static function posted( array $form ): array {
+        $entry = [];
+        foreach ( (array) ( $form['fields'] ?? [] ) as $field ) {
+            $id = (string) ( $field->id ?? '' );
+            foreach ( wp_unslash( $_POST ) as $key => $value ) { // phpcs:ignore WordPress.Security.NonceVerification
+                if ( preg_match( '/^input_' . preg_quote( $id, '/' ) . '(?:_(\d+))?$/', (string) $key, $m ) ) {
+                    $entry[ isset( $m[1] ) ? $id . '.' . $m[1] : $id ] = $value;
+                }
+            }
+        }
+        return $entry;
     }
 
     /** The visitor resumed a draft Gravity Forms saved for this form (it still exists until the entry is saved). */

@@ -6,8 +6,8 @@ namespace Breakwater;
 
 /**
  * Senders this site has said are not spam. Once someone's message is marked "Not spam" or
- * delivered, their next ones get the benefit of the doubt (a -10 signal, so a filled
- * honeypot or a missing browser still stops a bot that borrowed the address).
+ * delivered, their next ones get the benefit of the doubt (a -10 signal, dropped when a signal
+ * only automation trips fires, so a bot that borrowed the address is still stopped).
  * Stored as hashes, for a year.
  */
 final class Trust {

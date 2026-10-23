@@ -158,6 +158,9 @@
 	function search( task, from ) {
 		var batch = [];
 		var end = Math.min( from + 500, task.max + 1 );
+		if ( ! ( end > from ) ) {
+			return Promise.reject( new Error( 'no solution' ) );
+		}
 		for ( var n = from; n < end; n++ ) {
 			batch.push( digest( task.salt + n ) );
 		}
@@ -185,8 +188,17 @@
 		}
 		var url = config.endpoint + ( config.endpoint.indexOf( '?' ) === -1 ? '?' : '&' ) + '_=' + Date.now();
 		solving = fetch( url, { credentials: 'same-origin', cache: 'no-store' } )
-			.then( function ( response ) { return response.json(); } )
+			.then( function ( response ) {
+				if ( ! response.ok ) {
+					throw new Error( 'challenge unavailable' );
+				}
+				return response.json();
+			} )
 			.then( function ( task ) {
+				// A security plugin or cache can answer with something else: never search without a valid task.
+				if ( ! task || typeof task.max !== 'number' || task.max < 1 || typeof task.salt !== 'string' || typeof task.challenge !== 'string' || typeof task.signature !== 'string' ) {
+					throw new Error( 'not a challenge' );
+				}
 				return search( task, 0 ).then( function ( number ) {
 					token = btoa( JSON.stringify( {
 						salt: task.salt,
@@ -274,6 +286,16 @@
 		if ( ! form.dataset.bw ) {
 			return;
 		}
+		if ( form.dataset.bwSending ) {
+			delete form.dataset.bwSending; // The held submit, sent on: with a proof, or without one after 4s.
+			return;
+		}
+		if ( form.dataset.bwWaiting ) {
+			// Already holding this form: a second click or Enter must not send it twice.
+			event.preventDefault();
+			event.stopImmediatePropagation();
+			return;
+		}
 		field( form, 'bw_meta', meta() );
 		remember();
 		carry();
@@ -286,8 +308,8 @@
 			spent();
 			return;
 		}
-		if ( form.dataset.bwWaiting ) {
-			return; // Already holding this form; a second click sends it as-is.
+		if ( ! form.requestSubmit ) {
+			return; // Safari before 16: form.submit() would skip the form's own handlers, so send it as-is.
 		}
 		event.preventDefault();
 		event.stopImmediatePropagation();
@@ -298,12 +320,9 @@
 			field( form, 'bw_token', token );
 			field( form, 'bw_meta', meta() );
 			spent();
-			if ( form.requestSubmit ) {
-				form.requestSubmit( submitter && submitter.form === form ? submitter : undefined );
-			} else {
-				form.submit();
-			}
 			delete form.dataset.bwWaiting;
+			form.dataset.bwSending = '1';
+			form.requestSubmit( submitter && submitter.form === form ? submitter : undefined );
 		} );
 	}, true );
 

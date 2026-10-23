@@ -65,7 +65,10 @@ final class Log {
             KEY content_hash (content_hash),
             KEY source_ref (source, ref)
         ) {$charset};" );
-        update_option( 'breakwater_db_version', self::DB_VERSION, false );
+        // Only once the newest column exists: a failed ALTER (a lock timeout on a big table) is tried again.
+        if ( $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM ' . $table . ' LIKE %s', 'replay' ) ) ) {
+            update_option( 'breakwater_db_version', self::DB_VERSION, false );
+        }
     }
 
     /**

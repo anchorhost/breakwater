@@ -30,7 +30,8 @@ final class WPForms extends Adapter {
     public function keepsSpam(): bool { return function_exists( 'wpforms' ) && wpforms()->is_pro(); }
 
     public function register(): void {
-        add_action( 'wpforms_process', $this->check( ... ), 99, 3 );
+        // Before Stripe, Square and PayPal Commerce (10), which charge the card unless the form has errors.
+        add_action( 'wpforms_process', $this->check( ... ), 5, 3 );
         add_action( 'wpforms_process_entry_saved', $this->link( ... ), 10, 4 );
         add_action( 'wpforms_pro_anti_spam_entry_set_as_not_spam', $this->notSpam( ... ), 10, 2 );
         add_action( 'wpforms_pro_anti_spam_entry_marked_as_spam', $this->markedSpam( ... ), 10, 2 );

@@ -14,8 +14,16 @@ final class Submission {
     /** Field keys that belong to form plumbing, never to the visitor's message. */
     public const SKIP = '/^(bw_|_wp|_wpcf7|wpcf7|gform_|is_submit_|state_|gf_|version_hash|action$|post_id$|form_id$|queried_id$|referer_title$|referrer$|nonce|security$|g-recaptcha-response|cf-turnstile-response|h-captcha-response|wpforms\[(id|author|post_id|nonce|token)|_ajax_nonce|redirect_to$|testcookie$|submit$|elementor|woocommerce-|_wp_http_referer|_mc4wp|_fluentform|__fluent|fluentform_|_frm|frm_|item_key$|form_key$|forminator_|_forminator|nf_|_nf|et_pb_contactform_submit_|et_pb_contact_email_fields_|et_pb_contact_email_hidden_fields_|et_pb_contact_captcha_|et_pb_contact_et_number_|et_pb_contact_form_unique_id|et_builder_submit_button|token$|et_post_id$|_wpnonce-et-pb-|fusion_|form_instance_id|_kb_|kb_form|_kad|give-|_give|um_request|form_type$|mode$|_um_)/i';
 
-    /** Values never stored or shown: credentials and card data. */
-    public const SECRET = '/pass|pwd|card|cvv|cvc|ccnum|cc_|iban|routing|ssn/i';
+    /**
+     * Values never stored or shown: credentials and card data. Matched as whole words or
+     * underscore-separated parts, so "passenger" and "postcard" are kept.
+     */
+    public const SECRET = '/(?<![a-z])(pass(word|wd|phrase|code)?|pwd?|pin|cvv2?|cvc|ccv|cc[\s_-]?(num|number|exp)?|ccnum|(credit[\s_-]?)?card([\s_-]?(num|number|no|code|cvc|cvv))?|cardnumber|security[\s_-]?code|expiry|iban|sort[\s_-]?code|routing([\s_-]?number)?|account[\s_-]?number|ssn|social[\s_-]?security|contrase(ñ|n)a|kennwort|mot[\s_-]de[\s_-]passe)(?![a-z])|creditcard|user_pass|account_password/iu';
+
+    /** Longest value kept per field, and longest text judged: enough for any real message. */
+    private const MAX_FIELD  = 20000;
+    private const MAX_TEXT   = 65000;
+    private const MAX_FIELDS = 100;
 
     /**
      * Field types whose values are the site's own text, choices or tracking, never the
@@ -76,8 +84,10 @@ final class Submission {
         $s    = self::browser( $source, $form, $post );
 
         $texts = [];
-        foreach ( self::flatten( $post ) as $key => $value ) {
-            if ( '' === $value || preg_match( self::SKIP, $key ) ) {
+        foreach ( array_slice( self::flatten( $post ), 0, self::MAX_FIELDS * 2, true ) as $key => $value ) {
+            $key   = self::clean( (string) $key );
+            $value = self::clean( $value );
+            if ( '' === $value || preg_match( self::SKIP, $key ) || count( $s->fields ) >= self::MAX_FIELDS ) {
                 continue;
             }
             if ( preg_match( self::SECRET, $key ) ) {
@@ -94,7 +104,7 @@ final class Submission {
             }
             $texts[] = $value;
         }
-        $s->content = implode( "\n", $texts );
+        $s->content = mb_substr( implode( "\n", $texts ), 0, self::MAX_TEXT );
         return $s;
     }
 
@@ -111,10 +121,13 @@ final class Submission {
         $texts = [];
         $first = '';
         $last  = '';
-        foreach ( $fields as $i => $field ) {
+        foreach ( array_slice( $fields, 0, self::MAX_FIELDS, true ) as $i => $field ) {
+            if ( ! is_array( $field ) ) {
+                continue;
+            }
             $type  = self::canonical( (string) ( $field['type'] ?? '' ) );
-            $label = trim( wp_strip_all_tags( (string) ( $field['label'] ?? '' ) ) );
-            $value = self::text( $field['value'] ?? '' );
+            $label = trim( wp_strip_all_tags( self::clean( (string) ( $field['label'] ?? '' ) ) ) );
+            $value = self::clean( self::text( $field['value'] ?? '' ) );
             if ( '' === $value ) {
                 continue;
             }
@@ -122,7 +135,8 @@ final class Submission {
             if ( isset( $s->fields[ $key ] ) ) {
                 $key .= ' [' . ( $field['key'] ?? $i ) . ']';
             }
-            if ( in_array( $type, [ 'password', 'passwordconfirm', 'creditcard', 'credit-card', 'credit_card' ], true ) || preg_match( self::SECRET, $key ) ) {
+            // Ninja Forms' card fields are creditcardnumber, creditcardcvc, creditcardexpiration, ...
+            if ( in_array( $type, [ 'password', 'passwordconfirm' ], true ) || preg_match( '/^credit[-_]?card/', $type ) || preg_match( self::SECRET, $key ) ) {
                 $s->fields[ $key ] = '[redacted]';
                 continue;
             }
@@ -130,7 +144,7 @@ final class Submission {
             if ( in_array( $type, self::NOT_MESSAGE, true ) ) {
                 continue;
             }
-            if ( 'email' === $type || ( '' === $s->email && 'text' === $type && is_email( $value ) ) ) {
+            if ( ( 'email' === $type && is_email( $value ) ) || ( '' === $s->email && 'text' === $type && is_email( $value ) ) ) {
                 $s->email = '' === $s->email ? $value : $s->email;
                 continue;
             }
@@ -149,7 +163,7 @@ final class Submission {
         if ( '' === $s->name ) {
             $s->name = trim( $first . ' ' . $last );
         }
-        $s->content = implode( "\n", $texts );
+        $s->content = mb_substr( implode( "\n", $texts ), 0, self::MAX_TEXT );
         return $s;
     }
 
@@ -173,9 +187,34 @@ final class Submission {
         $s->trap   = is_string( $post['bw_url'] ?? null ) ? trim( $post['bw_url'] ) : '';
         // The form's own hidden fields first; the cookies cover plugins that post their own payload.
         $s->token = self::proof( $post, 'bw_token' );
-        $meta     = json_decode( self::proof( $post, 'bw_meta' ), true );
-        $s->meta  = is_array( $meta ) ? $meta : null;
+        $meta     = json_decode( substr( self::proof( $post, 'bw_meta' ), 0, 1000 ), true );
+        $s->meta  = is_array( $meta ) ? self::meta( $meta ) : null;
         return $s;
+    }
+
+    /**
+     * Only what the script sends: counts as integers and the user-agent hash. Anything else a
+     * visitor puts in bw_meta is dropped, so it can't be stored.
+     *
+     * @param array<mixed> $raw
+     * @return array<string, int|string>
+     */
+    private static function meta( array $raw ): array {
+        $out = [];
+        foreach ( [ 'e', 'i', 'k', 'w', 't', 'p', 'v' ] as $key ) {
+            if ( isset( $raw[ $key ] ) && is_numeric( $raw[ $key ] ) ) {
+                $out[ $key ] = (int) max( 0, min( 1e12, (float) $raw[ $key ] ) );
+            }
+        }
+        if ( is_string( $raw['u'] ?? null ) && preg_match( '/^[0-9a-f]{8}$/', $raw['u'] ) ) {
+            $out['u'] = $raw['u'];
+        }
+        return $out;
+    }
+
+    /** Valid UTF-8 (a stray byte would switch off the checks that read letters), and not endless. */
+    private static function clean( string $value ): string {
+        return mb_substr( wp_check_invalid_utf8( $value, true ), 0, self::MAX_FIELD );
     }
 
     /**

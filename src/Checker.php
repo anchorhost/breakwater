@@ -54,6 +54,10 @@ final class Checker {
         $checker->repeats();
         $checker->fleet();
 
+        // A sender marked not spam before gets the benefit of the doubt, never a pass for what only automation does.
+        if ( isset( $checker->signals['trusted_sender'] ) && array_intersect_key( $checker->signals, array_flip( self::CERTAIN ) ) ) {
+            $checker->signals['trusted_sender'] = [ 0, 'marked not spam on this site before, but sent by a bot' ];
+        }
         $signals = (array) apply_filters( 'breakwater_signals', $checker->signals, $s );
         $score   = array_sum( array_map( fn ( array $signal ): int => (int) $signal[0], $signals ) );
         return new Verdict( $score >= self::threshold(), $score, $signals );
@@ -304,6 +308,12 @@ final class Checker {
         return null;
     }
 
+    /** Already spam: no need for a DNS lookup a visitor could make slow on purpose. */
+    private function decided(): bool {
+        return array_sum( array_map( fn ( array $signal ): int => (int) $signal[0], $this->signals ) ) >= self::threshold()
+            || array_intersect_key( $this->signals, array_flip( self::CERTAIN ) );
+    }
+
     private function sender(): void {
         $email = $this->s->email;
         if ( '' === $email || ! str_contains( $email, '@' ) ) {
@@ -316,7 +326,7 @@ final class Checker {
         $domain = strtolower( substr( (string) strrchr( $email, '@' ), 1 ) );
         if ( self::disposable( $domain ) ) {
             $this->add( 'disposable_email', 3, $domain . ' is a throwaway mail service' );
-        } elseif ( ! self::domainReceivesMail( $domain ) ) {
+        } elseif ( ! $this->decided() && ! self::domainReceivesMail( $domain ) ) {
             $this->add( 'dead_email_domain', 3, $domain . ' cannot receive mail' );
         }
     }

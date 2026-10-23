@@ -45,7 +45,8 @@ final class WooCommerce extends Adapter {
     }
 
     private function check( mixed $errors, mixed $username, mixed $email ): mixed {
-        if ( ! isset( $_POST['woocommerce-register-nonce'] ) || ! $errors instanceof WP_Error || $errors->has_errors() ) { // phpcs:ignore WordPress.Security.NonceVerification
+        // The My Account form, as WooCommerce recognises it (it also takes the nonce as _wpnonce); not checkout.
+        if ( ! isset( $_POST['register'], $_POST['email'] ) || ! $errors instanceof WP_Error || $errors->has_errors() ) { // phpcs:ignore WordPress.Security.NonceVerification
             return $errors;
         }
         $s = Submission::fromFields( $this->source(), 'my-account registration', [

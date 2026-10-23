@@ -121,7 +121,7 @@ final class Elementor extends Adapter {
         $id     = (string) $record->get_form_settings( 'id' );
         $name   = (string) $record->get_form_settings( 'form_name' );
         $fields = array_map(
-            fn ( array $field ): array => [ 'type' => $field['type'] ?? '', 'label' => $field['title'] ?? '', 'value' => $field['raw_value'] ?? $field['value'] ?? '', 'key' => $field['id'] ?? '' ],
+            fn ( mixed $field ): array => is_array( $field ) ? [ 'type' => $field['type'] ?? '', 'label' => $field['title'] ?? '', 'value' => $field['raw_value'] ?? $field['value'] ?? '', 'key' => $field['id'] ?? '' ] : [],
             array_values( (array) $record->get( 'fields' ) )
         );
         $verdict = $this->evaluate( Submission::fromFields( $this->source(), trim( $id . ': ' . $name, ': ' ), $fields ) );

@@ -49,14 +49,17 @@ final class Digest {
             $groups[ implode( ',', $to ) ][] = $row;
         }
         $out['bots'] = count( $bots );
+        $sent        = [];
         foreach ( $groups as $to => $held ) {
             $out['listed'] += count( $held );
             if ( ! $dry_run && wp_mail( explode( ',', $to ), self::subject( count( $held ) ), self::body( $held, count( $bots ) ), [ 'Content-Type: text/html; charset=UTF-8' ] ) ) {
                 ++$out['sent'];
+                $sent = array_merge( $sent, array_map( fn ( object $row ): int => (int) $row->id, $held ) );
             }
         }
-        if ( ! $dry_run ) {
-            Log::markDigested( array_merge( $bots, array_map( fn ( object $row ): int => (int) $row->id, array_merge( [], ...array_values( $groups ) ) ) ) );
+        // A digest that failed to send is tried again tomorrow. Bots are only ever counted.
+        if ( ! $dry_run && ( $sent || ! $groups ) ) {
+            Log::markDigested( array_merge( $bots, $sent ) );
         }
         return $out;
     }
@@ -75,7 +78,7 @@ final class Digest {
                 . '<div><strong>' . esc_html( (string) $row->email ?: 'no email given' ) . '</strong></div>'
                 . '<div style="margin:6px 0;white-space:pre-wrap">' . esc_html( mb_substr( (string) $row->excerpt, 0, 300 ) ) . '</div>'
                 . '<div style="color:#666;font-size:13px">Held because: ' . esc_html( $why ) . '</div>'
-                . '<div style="margin-top:6px"><a href="' . esc_url( Delivery::url( (int) $row->id ) ) . '">Not spam? Deliver it</a></div>'
+                . '<div style="margin-top:6px"><a href="' . esc_url( Delivery::url( $row ) ) . '">Not spam? Deliver it</a></div>'
                 . '</td></tr>';
         }
         $more = count( $held ) > 50 ? '<p>' . ( count( $held ) - 50 ) . ' more are in Tools → Breakwater.</p>' : '';

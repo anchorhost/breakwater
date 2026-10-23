@@ -19,12 +19,13 @@ final class Delivery {
         add_action( 'admin_post_breakwater_deliver', [ self::class, 'handle' ] );
     }
 
-    public static function url( int $id ): string {
-        return add_query_arg( [ 'action' => 'breakwater_deliver', 'id' => $id, 'sig' => self::signature( $id ) ], admin_url( 'admin-post.php' ) );
+    public static function url( object $row ): string {
+        return add_query_arg( [ 'action' => 'breakwater_deliver', 'id' => (int) $row->id, 'sig' => self::signature( $row ) ], admin_url( 'admin-post.php' ) );
     }
 
-    private static function signature( int $id ): string {
-        return substr( hash_hmac( 'sha256', 'deliver|' . $id, Plugin::secret() ), 0, 32 );
+    /** Signs the row's time too, so a log table made again (new rows, same ids) can't reuse a link. */
+    private static function signature( object $row ): string {
+        return substr( hash_hmac( 'sha256', 'deliver|' . (int) $row->id . '|' . $row->created_at, Plugin::secret() ), 0, 32 );
     }
 
     /**
@@ -61,7 +62,7 @@ final class Delivery {
         $id  = absint( $_REQUEST['id'] ?? 0 );
         $sig = sanitize_text_field( wp_unslash( (string) ( $_REQUEST['sig'] ?? '' ) ) );
         $row = $id ? Log::get( $id ) : null;
-        if ( ! $row || ! hash_equals( self::signature( $id ), $sig ) ) {
+        if ( ! $row || ! hash_equals( self::signature( $row ), $sig ) ) {
             self::page( 'Link not valid', '<p>This link is not valid, or the submission is older than ' . Log::keepDays() . ' days and was removed.</p>', 404 );
         }
         if ( $row->delivered_at ) {

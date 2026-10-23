@@ -77,7 +77,7 @@ final class Reputation {
      * @return list<string>
      */
     public static function bands( string $text, string $home ): array {
-        $words = array_slice( preg_split( '/\s+/', self::normalize( $text, $home ), -1, PREG_SPLIT_NO_EMPTY ) ?: [], 0, self::MAX_WORDS );
+        $words = array_slice( preg_split( '/\s+/', self::normalize( $text, $home ), self::MAX_WORDS + 1, PREG_SPLIT_NO_EMPTY ) ?: [], 0, self::MAX_WORDS );
         if ( count( $words ) < self::MIN_WORDS ) {
             return [];
         }

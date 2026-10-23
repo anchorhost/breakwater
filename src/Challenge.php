@@ -58,12 +58,17 @@ final class Challenge {
         if ( time() > (int) $parts[2] ) {
             return Proof::Expired;
         }
-        // One solution per submission, remembered until the challenge would expire anyway.
+        // One solution per submission, remembered until the challenge would expire anyway. Added
+        // (never set), so two requests racing with one solution can't both pass.
         $key = 'breakwater_used_' . substr( $challenge, 0, 32 );
-        if ( get_transient( $key ) ) {
+        $ttl = max( 60, (int) $parts[2] - time() );
+        if ( wp_using_ext_object_cache() ) {
+            return wp_cache_add( $key, 1, 'transient', $ttl ) ? Proof::Ok : Proof::Replayed;
+        }
+        if ( false !== get_transient( $key ) || ! add_option( '_transient_timeout_' . $key, time() + $ttl, '', false ) ) {
             return Proof::Replayed;
         }
-        set_transient( $key, 1, max( 60, (int) $parts[2] - time() ) );
+        add_option( '_transient_' . $key, 1, '', false );
         return Proof::Ok;
     }
 }
