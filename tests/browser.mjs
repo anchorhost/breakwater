@@ -6,7 +6,7 @@ const require = createRequire( import.meta.url );
 const { chromium } = require( process.env.PLAYWRIGHT || 'playwright' );
 
 const base = process.argv[ 2 ] || 'https://protect.localhost';
-const wpPath = process.env.WP_PATH || '/Users/austin/Cove/Sites/protect.localhost/public';
+const wpPath = process.env.WP_PATH || `${ process.env.HOME }/Cove/Sites/protect.localhost/public`;
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
 const stamp = Date.now().toString( 36 );
 

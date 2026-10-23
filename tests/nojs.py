@@ -1,9 +1,9 @@
 """A bot with no browser: scrape each form, fill it, POST it straight back.
 Usage: python3 -I tests/nojs.py https://protect.localhost"""
-import html.parser, json, ssl, subprocess, sys, time, urllib.parse, urllib.request
+import html.parser, json, os, ssl, subprocess, sys, time, urllib.parse, urllib.request
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else 'https://protect.localhost'
-WP = '/Users/austin/Cove/Sites/protect.localhost/public'
+WP = os.environ.get('WP_PATH') or os.path.expanduser('~/Cove/Sites/protect.localhost/public')
 CTX = ssl._create_unverified_context()
 STAMP = str(int(time.time()))
 UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36'
