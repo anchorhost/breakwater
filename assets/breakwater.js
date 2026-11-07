@@ -81,10 +81,26 @@
 		return !! target && target.tagName === 'TEXTAREA';
 	}
 	document.addEventListener( 'focusin', function ( event ) {
-		if ( event.target && event.target.matches && event.target.matches( 'input, textarea, select' ) ) {
+		if ( event.target && event.target.matches && event.target.matches( 'input, textarea, select' ) && wanted( event.target ) ) {
 			solve();
 		}
 	}, true );
+
+	// Each proof is a request to the site, so none for what Breakwater never checks: search boxes,
+	// forms that send by GET, and WooCommerce's cart and sort forms. Forms with no method at all
+	// still count: Ninja Forms, Beaver Builder and Breakdance send theirs by script.
+	function wanted( input ) {
+		if ( input.type === 'search' || input.type === 'hidden' || input.name === 's' || input.closest( '[role="search"], .search-form, .searchform' ) ) {
+			return false;
+		}
+		var form = input.closest( 'form' );
+		if ( ! form ) {
+			return true;
+		}
+		return ( form.getAttribute( 'method' ) || '' ).toLowerCase() !== 'get'
+			&& ! form.querySelector( 'input[name="s"], input[type="search"]' )
+			&& ! form.matches( 'form.cart, .woocommerce-cart-form, .woocommerce-ordering' );
+	}
 
 	// Picks up where the page before left off, if it was a form sent less than 30 minutes ago.
 	function carried() {
@@ -233,6 +249,9 @@
 
 	function protectable( form ) {
 		var method = ( form.getAttribute( 'method' ) || 'get' ).toLowerCase();
+		if ( form.matches( 'form.cart, .woocommerce-cart-form, .woocommerce-ordering, [role="search"]' ) ) {
+			return false; // Adding to the cart, sorting and searching are never checked.
+		}
 		return method === 'post' || form.matches( '.elementor-form, .wpcf7-form, .wpforms-form, form[id^="gform_"]' );
 	}
 
