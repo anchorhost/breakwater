@@ -34,7 +34,6 @@ final class Cli {
             'configured'   => Plugin::configuredMode()->value,
             'other'        => Plugin::otherChecker() ?: 'none',
             'integrations' => implode( ', ', array_keys( Registry::detected() ) ),
-            'words'        => Words::summary(),
             'days'         => $days,
         ];
         if ( 'json' === Utils\get_flag_value( $assoc, 'format', 'table' ) ) {
@@ -108,25 +107,6 @@ final class Cli {
         foreach ( [ 'ip', 'email', 'message', 'mband' ] as $kind ) {
             WP_CLI::line( str_pad( $kind, 9 ) . count( (array) ( $stored[ $kind ] ?? [] ) ) . ' hashes' );
         }
-    }
-
-    /**
-     * Shows the fleet word model, or imports one.
-     *
-     * [--import=<file>]
-     * : The model JSON CaptainCore exports (v, generated, p, k), to store as a host's sync would.
-     *
-     * @param list<string>          $args
-     * @param array<string, string> $assoc
-     */
-    public function words( array $args, array $assoc ): void {
-        if ( isset( $assoc['import'] ) ) {
-            Words::store( (string) file_get_contents( (string) $assoc['import'] ) )
-                ? WP_CLI::success( 'Word model stored: ' . Words::summary() . '.' )
-                : WP_CLI::error( 'Not a word model: it needs v 1, a generated date, p and k.' );
-            return;
-        }
-        WP_CLI::line( 'Word model: ' . Words::summary() . ( Words::model() || ! get_option( Words::OPTION ) ? '' : ' (older than 7 days: ignored)' ) );
     }
 
     /**
