@@ -38,8 +38,13 @@ if [ ! -f wp-config.php ]; then
     exit 0
 fi
 WP="wp --skip-themes"
+# One value from wp eval, sent between markers: plugins can print after the script's own
+# output (Elementor's logger prints PHP 8.4 deprecation notices at shutdown).
+wp_value() {
+    $WP "$@" 2>/dev/null | sed -n 's/.*<bw>\([^<]*\)<\/bw>.*/\1/p' | tail -1
+}
 home=$($WP --skip-plugins option get home 2>/dev/null)
-mu_dir=$($WP --skip-plugins eval 'echo WPMU_PLUGIN_DIR;' 2>/dev/null | tail -1)
+mu_dir=$(wp_value --skip-plugins eval 'echo "<bw>" . WPMU_PLUGIN_DIR . "</bw>";')
 mu_dir=${mu_dir:-wp-content/mu-plugins}
 target="$mu_dir/breakwater.php"
 
@@ -88,7 +93,7 @@ BASH;
 			: "\$WP option add breakwater '{\"mode\":\"$mode\"}' --format=json >/dev/null 2>&1\n";
 	}
 	$script = $common . <<<BASH
-php_id=\$(\$WP --skip-plugins eval 'echo PHP_VERSION_ID;' 2>/dev/null)
+php_id=\$(wp_value --skip-plugins eval 'echo "<bw>" . PHP_VERSION_ID . "</bw>";')
 if [ -z "\$php_id" ] || [ "\$php_id" -lt 80100 ]; then
     echo "BREAKWATER|\$home|skip|PHP \${php_id:-unknown} is older than 8.1"
     exit 0
@@ -118,7 +123,7 @@ if [ -f "\$target" ]; then
 fi
 chmod 644 "\$tmp"
 mv -f "\$tmp" "\$target"
-{$set_mode}status=\$(\$WP eval 'echo defined( "BREAKWATER_FILE" ) && class_exists( "Breakwater\\\\Plugin", false ) ? Breakwater\\Plugin::VERSION . " " . Breakwater\\Plugin::mode()->value : "not-loaded";' 2>/dev/null | tail -1)
+{$set_mode}status=\$(wp_value eval 'echo "<bw>", ( defined( "BREAKWATER_FILE" ) && class_exists( "Breakwater\\\\Plugin", false ) ? Breakwater\\Plugin::VERSION . " " . Breakwater\\Plugin::mode()->value : "not-loaded" ), "</bw>";')
 case "\$status" in
     $version\ *)
         rm -f "\$backup"
