@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+* **CleanTalk's real verdict is logged next to Breakwater's.** On sites still running CleanTalk, each log row recorded CleanTalk's verdict before CleanTalk had decided (it checks Gravity Forms after Breakwater does), so every row said CleanTalk let it through. Breakwater now reads CleanTalk's own counters when the request ends: rows get CleanTalk's actual verdict, or none when it didn't check. Submissions CleanTalk stops before any form plugin runs (Elementor, Forminator, Ninja Forms, Avada, Kadence, MailPoet, WPForms and others it checks on their AJAX request) are now logged too, judged by Breakwater and marked as stopped by CleanTalk, so the log shows what Breakwater would have done with them. Breakwater never acts on those itself.
+* **"Not spam" on an entry CleanTalk caught hands it back.** With CleanTalk's verdict known, marking a Gravity Forms entry CleanTalk sent to Spam as Not Spam (in Gravity Forms, Tools → Breakwater or `wp breakwater release`) restores it and sends the notifications and feeds it skipped, which Gravity Forms doesn't do on its own. Submissions CleanTalk stopped before the form plugin saw them have nothing to hand back and are only marked.
+
 ## 0.3.0 (2026-10-22)
 
 * **Fixes from the pre-release review.**

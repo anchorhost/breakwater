@@ -180,6 +180,18 @@ final class Log {
         return array_map( 'intval', array_merge( [ 'checked' => 0, 'spam' => 0, 'held' => 0, 'released' => 0, 'ham' => 0 ], array_filter( $row, 'is_numeric' ) ) );
     }
 
+    /**
+     * The other spam service's verdict, once it is known: spam, ham, or '' when it didn't judge.
+     *
+     * @param list<int> $ids
+     */
+    public static function setOther( array $ids, string $verdict ): void {
+        global $wpdb;
+        foreach ( $ids as $id ) {
+            $wpdb->update( self::table(), [ 'other_verdict' => $verdict ], [ 'id' => (int) $id ] );
+        }
+    }
+
     public static function setFeedback( int $id, string $feedback ): void {
         global $wpdb;
         $wpdb->update( self::table(), [ 'feedback' => $feedback ], [ 'id' => $id ] );

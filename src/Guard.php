@@ -15,8 +15,16 @@ final class Guard {
     /** The log row of this request's most recent check, for adapters that link it to the entry they save. */
     private static int $last_log_id = 0;
 
+    /** @var list<int> Every row this request logged, for CleanTalkWatch to add CleanTalk's verdict to. */
+    private static array $log_ids = [];
+
     public static function lastLogId(): int {
         return self::$last_log_id;
+    }
+
+    /** @return list<int> */
+    public static function logIds(): array {
+        return self::$log_ids;
     }
 
     public static function evaluate( Submission $s ): Verdict {
@@ -39,6 +47,9 @@ final class Guard {
         $action  = $verdict->spam ? ( $act ? 'blocked' : 'logged' ) : 'allowed';
         $verdict = $verdict->acted( $act, Log::insert( $s, $verdict, $action ) );
         self::$last_log_id = $verdict->log_id;
+        if ( $verdict->log_id ) {
+            self::$log_ids[] = $verdict->log_id;
+        }
 
         do_action( 'breakwater_checked', $verdict, $s );
         return self::$seen[ $key ] = $verdict;
