@@ -27,6 +27,7 @@ final class Elementor extends Adapter {
 
     public function register(): void {
         add_action( 'elementor_pro/forms/validation', $this->check( ... ), 99, 2 );
+        add_filter( 'elementor_pro/atomic_forms/spam_check', $this->checkAtomic( ... ), 99, 2 );
     }
 
     /**
@@ -131,6 +132,28 @@ final class Elementor extends Adapter {
         self::stash( $verdict->log_id, $record, $id );
         $ajax_handler->add_error_message( $this->message() );
         $ajax_handler->add_error( 'breakwater', '' );
+    }
+
+    /**
+     * Elementor 4's atomic forms (the Form element of the V4 editor, still a hidden beta) send by
+     * their own AJAX action and ask this filter whether a submission is spam; true refuses it with
+     * Elementor's own message. Nothing is kept for a replay yet, so a held one released from the
+     * log is emailed to the site's admin instead.
+     */
+    private function checkAtomic( mixed $is_spam, mixed $form_fields = [] ): mixed {
+        if ( $is_spam || ! is_array( $form_fields ) ) {
+            return $is_spam;
+        }
+        $fields = [];
+        foreach ( $form_fields as $field ) {
+            if ( is_array( $field ) ) {
+                $fields[] = [ 'type' => (string) ( $field['type'] ?? '' ), 'label' => (string) ( $field['label'] ?? '' ), 'value' => $field['value'] ?? '', 'key' => (string) ( $field['id'] ?? '' ) ];
+            }
+        }
+        $id   = isset( $_POST['form_id'] ) && is_string( $_POST['form_id'] ) ? sanitize_text_field( wp_unslash( $_POST['form_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+        $name = isset( $_POST['form_name'] ) && is_string( $_POST['form_name'] ) ? sanitize_text_field( wp_unslash( $_POST['form_name'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+        $verdict = $this->evaluate( Submission::fromFields( $this->source(), trim( $id . ': ' . ( $name ?: 'Atomic form' ), ': ' ), $fields ) );
+        return $verdict->act ? true : $is_spam;
     }
 
     /**
