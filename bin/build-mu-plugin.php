@@ -16,7 +16,7 @@ $out  = $argv[1] ?? $root . '/dist/breakwater.php';
 // Dependency order: enums and value objects first, the Adapter base before every adapter,
 // the registry after them. Every file in src/ must be listed (checked below).
 $order = [
-	'Mode', 'Proof', 'Verdict', 'Reputation', 'Submission', 'Challenge', 'Log', 'Trust', 'Feedback',
+	'Mode', 'Proof', 'Verdict', 'Reputation', 'Submission', 'Challenge', 'Log', 'Site', 'Trust', 'Feedback',
 	'Checker', 'Guard', 'CleanTalkWatch', 'Delivery', 'Release', 'Digest', 'Privacy', 'Assets', 'Front', 'Api', 'Admin', 'Cli', 'Plugin',
 	'Adapters/Adapter',
 ];

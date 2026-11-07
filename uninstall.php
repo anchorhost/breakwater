@@ -14,7 +14,7 @@ if ( file_exists( WPMU_PLUGIN_DIR . '/breakwater.php' ) ) {
 function breakwater_uninstall_site() {
     global $wpdb;
     $wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'breakwater_log' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-    foreach ( array( 'breakwater', 'breakwater_db_version', 'breakwater_reputation', 'breakwater_trusted' ) as $option ) {
+    foreach ( array( 'breakwater', 'breakwater_db_version', 'breakwater_reputation', 'breakwater_trusted', 'breakwater_site', 'breakwater_moved' ) as $option ) {
         delete_option( $option );
     }
     $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_breakwater\\_%' OR option_name LIKE '\\_transient\\_timeout\\_breakwater\\_%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery

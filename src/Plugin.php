@@ -28,6 +28,7 @@ final class Plugin {
 
     public static function init(): void {
         Log::maybeInstall();
+        Site::check();
         Admin::register();
         Delivery::register();
         Privacy::register();
