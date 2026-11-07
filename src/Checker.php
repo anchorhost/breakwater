@@ -53,6 +53,7 @@ final class Checker {
         $checker->sender();
         $checker->repeats();
         $checker->fleet();
+        $checker->words();
 
         // A sender marked not spam before gets the benefit of the doubt, never a pass for what only automation does.
         if ( isset( $checker->signals['trusted_sender'] ) && array_intersect_key( $checker->signals, array_flip( self::CERTAIN ) ) ) {
@@ -367,6 +368,17 @@ final class Checker {
         $seen = max( $message, $similar );
         if ( $seen >= 4 ) {
             $this->add( 'fleet_message', $seen >= 11 ? 5 : 3, sprintf( $message >= $similar ? 'same message sent to %d sites' : 'near-identical message sent to %d sites', $seen ) );
+        }
+    }
+
+    /**
+     * The fleet word filter. Never enough to hold a message alone (+4 at most against a threshold
+     * of 5): it tips messages that already look wrong, and abstains on unfamiliar wording.
+     */
+    private function words(): void {
+        $p = Words::score( Words::tokensFor( $this->s ) );
+        if ( null !== $p && $p >= 0.95 ) {
+            $this->add( 'words', $p >= 0.99 ? 4 : 2, sprintf( 'wording matches fleet spam (%d%%)', (int) floor( $p * 100 ) ) );
         }
     }
 
