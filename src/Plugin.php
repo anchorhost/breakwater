@@ -31,6 +31,7 @@ final class Plugin {
         Site::check();
         Admin::register();
         Delivery::register();
+        Report::register();
         Privacy::register();
         Digest::register();
 

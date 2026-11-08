@@ -35,6 +35,7 @@ final class Cli {
             'other'        => Plugin::otherChecker() ?: 'none',
             'integrations' => implode( ', ', array_keys( Registry::detected() ) ),
             'days'         => $days,
+            'missed'       => Log::missed( $days ) . ' reported as spam after delivery',
         ];
         if ( 'json' === Utils\get_flag_value( $assoc, 'format', 'table' ) ) {
             WP_CLI::line( (string) wp_json_encode( $info + [ 'stats' => $stats ] ) );

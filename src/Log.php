@@ -13,7 +13,7 @@ namespace Breakwater;
  */
 final class Log {
 
-    public const DB_VERSION = 5;
+    public const DB_VERSION = 6;
 
     public static function table(): string {
         global $wpdb;
@@ -54,6 +54,7 @@ final class Log {
             excerpt text NOT NULL,
             payload longtext NOT NULL,
             feedback varchar(20) NOT NULL DEFAULT '',
+            feedback_at datetime DEFAULT NULL,
             digest_at datetime DEFAULT NULL,
             delivered_at datetime DEFAULT NULL,
             outcome varchar(255) NOT NULL DEFAULT '',
@@ -63,10 +64,13 @@ final class Log {
             KEY created_at (created_at),
             KEY ip_created (ip, created_at),
             KEY content_hash (content_hash),
-            KEY source_ref (source, ref)
+            KEY source_ref (source, ref),
+            KEY feedback_at (feedback_at)
         ) {$charset};" );
         // Only once the newest column exists: a failed ALTER (a lock timeout on a big table) is tried again.
-        if ( $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM ' . $table . ' LIKE %s', 'replay' ) ) ) {
+        if ( $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM ' . $table . ' LIKE %s', 'feedback_at' ) ) ) {
+            // Rows marked before the column existed: when is unknown, so their own time stands in.
+            $wpdb->query( "UPDATE {$table} SET feedback_at = created_at WHERE feedback != '' AND feedback_at IS NULL" );
             update_option( 'breakwater_db_version', self::DB_VERSION, false );
         }
     }
@@ -113,13 +117,13 @@ final class Log {
         $out   = [ 'spam_content' => 0, 'spam_ip' => 0 ];
         if ( '' !== $hash && strlen( $s->content ) >= 20 ) {
             $out['spam_content'] = (int) $wpdb->get_var( $wpdb->prepare(
-                "SELECT COUNT(*) FROM {$table} WHERE content_hash = %s AND ip != %s AND verdict = 'spam' AND feedback != 'not_spam' AND created_at > %s",
+                "SELECT COUNT(*) FROM {$table} WHERE content_hash = %s AND ip != %s AND ( verdict = 'spam' OR feedback = 'spam' ) AND feedback != 'not_spam' AND created_at > %s",
                 $hash, $s->ip, gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS )
             ) );
         }
         if ( '' !== $s->ip ) {
             $out['spam_ip'] = (int) $wpdb->get_var( $wpdb->prepare(
-                "SELECT COUNT(*) FROM {$table} WHERE ip = %s AND content_hash != %s AND verdict = 'spam' AND feedback != 'not_spam' AND created_at > %s",
+                "SELECT COUNT(*) FROM {$table} WHERE ip = %s AND content_hash != %s AND ( verdict = 'spam' OR feedback = 'spam' ) AND feedback != 'not_spam' AND created_at > %s",
                 $s->ip, $hash, gmdate( 'Y-m-d H:i:s', time() - HOUR_IN_SECONDS )
             ) );
         }
@@ -192,9 +196,31 @@ final class Log {
         }
     }
 
+    /** The owner's word on a row (not_spam or spam), and when it was given: the fleet sync reports rows marked since its last run. */
     public static function setFeedback( int $id, string $feedback ): void {
         global $wpdb;
-        $wpdb->update( self::table(), [ 'feedback' => $feedback ], [ 'id' => $id ] );
+        $wpdb->update( self::table(), [ 'feedback' => $feedback, 'feedback_at' => gmdate( 'Y-m-d H:i:s' ) ], [ 'id' => $id ] );
+    }
+
+    /** Has the site owner reported a message from this address as spam? */
+    public static function reportedSender( string $email ): bool {
+        global $wpdb;
+        return '' !== $email && (bool) $wpdb->get_var( $wpdb->prepare(
+            "SELECT 1 FROM " . self::table() . " WHERE feedback_at IS NOT NULL AND feedback = 'spam' AND email = %s LIMIT 1",
+            mb_substr( $email, 0, 191 )
+        ) );
+    }
+
+    /**
+     * Messages reported as spam after they were delivered, from the emails' Report link or
+     * "Was spam" in the log: how much gets past every check.
+     */
+    public static function missed( int $days = 30 ): int {
+        global $wpdb;
+        return (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM " . self::table() . " WHERE feedback_at > %s AND feedback = 'spam' AND action != 'blocked'",
+            gmdate( 'Y-m-d H:i:s', time() - $days * DAY_IN_SECONDS )
+        ) );
     }
 
     /**

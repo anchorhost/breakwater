@@ -323,6 +323,9 @@ final class Checker {
             $this->add( 'trusted_sender', -10, 'marked not spam on this site before' );
             return;
         }
+        if ( Log::reportedSender( $email ) ) {
+            $this->add( 'reported_sender', 5, 'an earlier message from this sender was reported as spam' );
+        }
         $domain = strtolower( substr( (string) strrchr( $email, '@' ), 1 ) );
         if ( self::disposable( $domain ) ) {
             $this->add( 'disposable_email', 3, $domain . ' is a throwaway mail service' );
