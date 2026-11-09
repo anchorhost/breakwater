@@ -98,6 +98,11 @@ final class CleanTalkWatch {
         if ( Release::running() || Guard::trusted() || str_ends_with( (string) ( $_SERVER['SCRIPT_NAME'] ?? '' ), 'wp-login.php' ) ) {
             return;
         }
+        // REST calls and server-to-server posts (mail and payment webhooks) aren't form
+        // submissions: a browser sending a form always says where it came from.
+        if ( ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || ( empty( $_SERVER['HTTP_REFERER'] ) && empty( $_SERVER['HTTP_ORIGIN'] ) ) ) {
+            return;
+        }
         $post   = wp_unslash( $_POST ); // phpcs:ignore WordPress.Security.NonceVerification
         $action = is_string( $post['action'] ?? null ) ? sanitize_key( $post['action'] ) : '';
         if ( preg_match( '/^(apbct|cleantalk|ct_|heartbeat)/', $action ) ) {
