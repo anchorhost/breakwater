@@ -219,8 +219,8 @@ final class Log {
     }
 
     /**
-     * Messages reported as spam after they were delivered, from the emails' Report link or
-     * "Was spam" in the log: how much gets past every check.
+     * Messages reported as spam after they were delivered, from "Was spam" in the log or
+     * the form plugin's own Spam button: how much gets past every check.
      */
     public static function missed( int $days = 30 ): int {
         global $wpdb;

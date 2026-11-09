@@ -9,7 +9,6 @@ use Breakwater\Feedback;
 use Breakwater\Guard;
 use Breakwater\Log;
 use Breakwater\Release;
-use Breakwater\Report;
 use Breakwater\Submission;
 
 /**
@@ -33,7 +32,6 @@ final class GravityForms extends Adapter {
         add_filter( 'gform_abort_submission_with_confirmation', $this->checkDraft( ... ), 99, 2 );
         add_action( 'gform_entry_created', $this->link( ... ), 10, 1 );
         add_action( 'gform_post_update_entry_property', $this->statusChanged( ... ), 10, 4 );
-        add_filter( 'gform_notification', $this->notification( ... ), 99, 3 );
     }
 
     /**
@@ -83,16 +81,6 @@ final class GravityForms extends Adapter {
         if ( is_array( $entry ) && ! empty( $entry['id'] ) && Guard::lastLogId() && function_exists( 'gform_update_meta' ) ) {
             gform_update_meta( (int) $entry['id'], 'breakwater_log_id', Guard::lastLogId() );
         }
-    }
-
-    /**
-     * Each notification names its entry's log row for the Report link, also when Background
-     * Notifications (on by default since 2.10) sends it from a later request.
-     */
-    private function notification( mixed $notification, mixed $form, mixed $entry ): mixed {
-        $entry_id = is_array( $entry ) ? (int) ( $entry['id'] ?? 0 ) : 0;
-        Report::expect( $entry_id && function_exists( 'gform_get_meta' ) ? (int) gform_get_meta( $entry_id, 'breakwater_log_id' ) : 0 );
-        return $notification;
     }
 
     /** Gravity Forms' own "Not Spam" releases it like ours does; "Spam" counts as feedback. */
