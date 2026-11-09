@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (2026-11-09)
 
 * **No database query on ordinary page views.** Every request read the stored schema version, which wasn't autoloaded, so each page view on every site cost one extra query, and the copied-site check added a second. The version is now autoloaded (one schema step moves it there) and the address check reads the autoloaded `home` option unless `WP_HOME` is defined, so a page view costs Breakwater no queries.
 * **No fatal error on `wp-admin/setup-config.php`.** Scanners request it on every site. The must-use build tried to create its table there with no database connected and the request ended in a PHP fatal error in the server log. Breakwater now waits for an ordinary request.
