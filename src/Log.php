@@ -13,7 +13,7 @@ namespace Breakwater;
  */
 final class Log {
 
-    public const DB_VERSION = 6;
+    public const DB_VERSION = 7;
 
     public static function table(): string {
         global $wpdb;
@@ -26,6 +26,11 @@ final class Log {
     }
 
     public static function maybeInstall(): void {
+        // wp-admin/setup-config.php and install.php load must-use plugins with no database
+        // connected; dbDelta() would fatal there. The next ordinary request installs.
+        if ( wp_installing() ) {
+            return;
+        }
         if ( (int) get_option( 'breakwater_db_version' ) < self::DB_VERSION ) {
             self::install();
         }
@@ -71,7 +76,9 @@ final class Log {
         if ( $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM ' . $table . ' LIKE %s', 'feedback_at' ) ) ) {
             // Rows marked before the column existed: when is unknown, so their own time stands in.
             $wpdb->query( "UPDATE {$table} SET feedback_at = created_at WHERE feedback != '' AND feedback_at IS NULL" );
-            update_option( 'breakwater_db_version', self::DB_VERSION, false );
+            // Autoloaded: maybeInstall() reads it on every request, and a non-autoloaded option is
+            // a query of its own each time.
+            update_option( 'breakwater_db_version', self::DB_VERSION, true );
         }
     }
 

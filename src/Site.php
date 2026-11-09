@@ -20,8 +20,12 @@ final class Site {
 
     public static function check(): void {
         global $wpdb;
-        // Straight from the table: get_option( 'home' ) returns WP_HOME when it is defined.
-        $home = untrailingslashit( (string) $wpdb->get_var( "SELECT option_value FROM {$wpdb->options} WHERE option_name = 'home' LIMIT 1" ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        // get_option( 'home' ) is free (autoloaded) but returns WP_HOME when that is defined,
+        // so only then is the table asked directly.
+        $home = defined( 'WP_HOME' )
+            ? (string) $wpdb->get_var( "SELECT option_value FROM {$wpdb->options} WHERE option_name = 'home' LIMIT 1" ) // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            : (string) get_option( 'home' );
+        $home = untrailingslashit( $home );
         if ( '' === $home ) {
             return;
         }
