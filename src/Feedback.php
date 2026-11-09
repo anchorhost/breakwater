@@ -25,6 +25,10 @@ final class Feedback {
     }
 
     public static function spam( int $log_id ): void {
+        // Only a person's word counts: Akismet's cron retry marks comments spam on its own.
+        if ( wp_doing_cron() ) {
+            return;
+        }
         $row = Log::get( $log_id );
         if ( ! $row ) {
             return;

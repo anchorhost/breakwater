@@ -226,7 +226,7 @@ final class Admin {
             </table>
             <?php $moved = Site::moved(); ?>
             <?php if ( $moved && $moved['at'] > time() - Log::keepDays() * DAY_IN_SECONDS ) : ?>
-                <p class="bw-muted bw-foot"><?php echo esc_html( sprintf( 'The log started fresh on %1$s, when the site address changed from %2$s to %3$s.', wp_date( get_option( 'date_format' ), (int) $moved['at'] ), $moved['from'], $moved['to'] ) ); ?></p>
+                <p class="bw-muted bw-foot"><?php echo esc_html( sprintf( 'The log started fresh on %1$s, when the site address changed to %2$s.', wp_date( get_option( 'date_format' ), (int) $moved['at'] ), $moved['to'] ) ); ?></p>
             <?php endif; ?>
             <p class="bw-muted bw-foot">Submissions are kept for <?php echo esc_html( number_format_i18n( Log::keepDays() ) ); ?> days, held or clean. The daily digest lists new held messages to each form's recipients.</p>
         </div>

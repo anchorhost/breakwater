@@ -24,7 +24,7 @@ Each submission is scored. At 5 points it is spam (`breakwater_threshold`).
 | Spam phrases | 1 each, max 3 | `breakwater_phrases` |
 | Throwaway email domain / domain can't receive mail | 3 | List in `data/disposable-domains.txt` (CC0) |
 | Greets the site by its address / a link to another site carrying it / names it | 4 / 3 / 1 | Mail-merge outreach ("Hello Example Com"); the strongest counts. Skipped when the site's name is its address |
-| Same message already caught as spam today | 3 | Messages reported from a notification email count too |
+| Same message already caught as spam today | 3 | Messages marked as spam count too |
 | Sender reported as spam before | 5 | Until they are marked not spam |
 | IP sent spam 2+ times in the last hour | 2 | |
 | Fleet: IP sent spam to 4+ / 11+ sites | 2 / 3 | Only with a fleet list (below) |

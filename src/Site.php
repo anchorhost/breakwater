@@ -11,7 +11,12 @@ namespace Breakwater;
  *
  * The address compared is the one stored in the database (the `home` option, which moves only
  * when a site is cloned, copied or moved), not home_url(): some sites build WP_HOME from the
- * request's host, and that changes from one request to the next.
+ * request's host, and that changes from one request to the next. It is read from the autoloaded
+ * options, so a page view costs no query and no filter can change it per request.
+ *
+ * Only a hash of the address is kept, without its scheme or a leading www: `wp search-replace`,
+ * which most clone and staging tools run, would rewrite a stored address along with `home`, and
+ * a switch to https is not a move.
  */
 final class Site {
 
@@ -20,34 +25,40 @@ final class Site {
 
     public static function check(): void {
         global $wpdb;
-        // get_option( 'home' ) is free (autoloaded) but returns WP_HOME when that is defined,
-        // so only then is the table asked directly.
-        $home = defined( 'WP_HOME' )
-            ? (string) $wpdb->get_var( "SELECT option_value FROM {$wpdb->options} WHERE option_name = 'home' LIMIT 1" ) // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            : (string) get_option( 'home' );
-        $home = untrailingslashit( $home );
+        $all  = wp_load_alloptions();
+        $home = untrailingslashit( (string) ( $all['home'] ?? get_option( 'home' ) ) );
         if ( '' === $home ) {
             return;
         }
+        $key   = self::key( $home );
         $known = get_option( self::OPTION );
-        if ( $known === $home ) {
+        if ( $known === $key ) {
             return;
         }
-        update_option( self::OPTION, $home, true );
+        update_option( self::OPTION, $key, true );
         if ( ! is_string( $known ) || '' === $known ) {
             return; // First run: nothing to compare with yet.
+        }
+        if ( ! preg_match( '/^[0-9a-f]{32}$/', $known ) && self::key( $known ) === $key ) {
+            return; // Stored as a plain address before 0.4.0: same site.
         }
         if ( ! apply_filters( 'breakwater_reset_on_move', true, $known, $home ) ) {
             return;
         }
         $rows = (int) $wpdb->query( 'DELETE FROM ' . Log::table() ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         delete_option( 'breakwater_trusted' );
-        update_option( self::MOVED, [ 'from' => $known, 'to' => $home, 'at' => time(), 'rows' => max( 0, $rows ) ], false );
+        update_option( self::MOVED, [ 'to' => $home, 'at' => time(), 'rows' => max( 0, $rows ) ], false );
     }
 
-    /** @return array{from:string, to:string, at:int, rows:int}|null */
+    /** The address without scheme, leading www or case, hashed. */
+    private static function key( string $home ): string {
+        $bare = strtolower( untrailingslashit( (string) preg_replace( '#^[a-z][a-z0-9+.-]*://#i', '', trim( $home ) ) ) );
+        return md5( (string) preg_replace( '/^www\./', '', $bare ) );
+    }
+
+    /** @return array{to:string, at:int, rows:int}|null */
     public static function moved(): ?array {
         $moved = get_option( self::MOVED );
-        return is_array( $moved ) && isset( $moved['from'], $moved['to'], $moved['at'] ) ? $moved : null;
+        return is_array( $moved ) && isset( $moved['to'], $moved['at'] ) ? $moved : null;
     }
 }
