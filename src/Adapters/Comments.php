@@ -91,17 +91,27 @@ final class Comments extends Adapter {
         if ( ! in_array( $type, [ '', 'comment', 'review' ], true ) ) {
             return $approved;
         }
-        $s = Submission::fromFields( $this->source(), 'post ' . (int) $comment['comment_post_ID'], [
-            [ 'type' => 'name', 'label' => 'author', 'value' => wp_unslash( (string) ( $comment['comment_author'] ?? '' ) ) ],
-            [ 'type' => 'email', 'label' => 'email', 'value' => wp_unslash( (string) ( $comment['comment_author_email'] ?? '' ) ) ],
-            [ 'type' => 'url', 'label' => 'url', 'value' => wp_unslash( (string) ( $comment['comment_author_url'] ?? '' ) ) ],
-            [ 'type' => 'textarea', 'label' => 'comment', 'value' => wp_unslash( (string) ( $comment['comment_content'] ?? '' ) ) ],
-        ] );
-        // The author name is not message text for comments: judge the comment and its link.
-        $s->content = trim( wp_unslash( (string) ( $comment['comment_content'] ?? '' ) ) . "\n" . $s->url );
-        $s->other   = 'spam' === $approved;
+        $s              = self::submission( wp_unslash( $comment ) );
+        $s->other       = 'spam' === $approved;
         self::$approved = is_int( $approved ) || is_string( $approved ) ? $approved : 0;
 
         return $this->evaluate( $s )->act ? 'spam' : $approved;
+    }
+
+    /**
+     * A comment as a submission, from the form (check) or from the database (Pending). The
+     * author name is not message text for comments: judge the comment and its link.
+     *
+     * @param array<string, mixed> $comment Unslashed comment fields.
+     */
+    public static function submission( array $comment ): Submission {
+        $s = Submission::fromFields( 'comment', 'post ' . (int) ( $comment['comment_post_ID'] ?? 0 ), [
+            [ 'type' => 'name', 'label' => 'author', 'value' => (string) ( $comment['comment_author'] ?? '' ) ],
+            [ 'type' => 'email', 'label' => 'email', 'value' => (string) ( $comment['comment_author_email'] ?? '' ) ],
+            [ 'type' => 'url', 'label' => 'url', 'value' => (string) ( $comment['comment_author_url'] ?? '' ) ],
+            [ 'type' => 'textarea', 'label' => 'comment', 'value' => (string) ( $comment['comment_content'] ?? '' ) ],
+        ] );
+        $s->content = trim( (string) ( $comment['comment_content'] ?? '' ) . "\n" . $s->url );
+        return $s;
     }
 }

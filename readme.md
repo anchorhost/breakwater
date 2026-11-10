@@ -55,6 +55,10 @@ The visitor's IP is `REMOTE_ADDR`, never a forwarded header a bot could set. Beh
 
 Deleting the plugin removes its log, settings, trusted senders and scheduled events (not when the must-use build is installed too, since that copy still uses them).
 
+## Comments already waiting
+
+Pending comments from before Breakwater was installed, or that reached the site some other way, can be checked in bulk: **Check pending with Breakwater** beside the Comments screen's Filter button checks every pending comment it hasn't seen (20 seconds a click, with a link to carry on), the **Check with Breakwater** bulk action checks the ones selected, and `wp breakwater pending [--dry-run]` does the same from the command line. They are judged on what was saved, so only the content, sender, repeat and fleet checks count, not the browser proof. Spam goes to the Spam folder, where WordPress's Not Spam puts it back; each comment checked keeps its score and reasons in the `breakwater_backlog` comment meta. Comments Breakwater checked when they were posted, and comments from people who edit the site, are left alone.
+
 ## When it gets one wrong
 
 Nothing is ever lost on CleanTalk-style servers: every held submission stays on the site.
@@ -139,6 +143,7 @@ wp breakwater log [--verdict=spam] [--source=gravityforms] [--limit=20] [--forma
 wp breakwater check --content="..." --email=... [--name=...]
 wp breakwater release <id>
 wp breakwater digest [--dry-run]
+wp breakwater pending [--dry-run]
 ```
 
 ## Tests

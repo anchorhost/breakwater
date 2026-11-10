@@ -18,7 +18,7 @@ function breakwater_uninstall_site() {
         delete_option( $option );
     }
     $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_breakwater\\_%' OR option_name LIKE '\\_transient\\_timeout\\_breakwater\\_%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-    foreach ( array( 'breakwater_log_id', 'breakwater_prior_approved' ) as $key ) {
+    foreach ( array( 'breakwater_log_id', 'breakwater_prior_approved', 'breakwater_backlog' ) as $key ) {
         delete_metadata( 'comment', 0, $key, '', true );
         delete_metadata( 'post', 0, $key, '', true );
     }

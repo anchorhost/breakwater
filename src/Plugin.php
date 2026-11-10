@@ -45,6 +45,7 @@ final class Plugin {
         Front::register();
         Registry::register();
         CleanTalkWatch::register();
+        Pending::register();
     }
 
     public static function deactivate(): void {

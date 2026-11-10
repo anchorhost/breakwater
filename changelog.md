@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* **Check the pending comments that piled up before Breakwater.** Comments waiting for moderation from before Breakwater was installed are never checked, so a site switching from another spam service could be left with hundreds of spam comments to clear by hand. "Check pending with Breakwater" beside the Comments screen's Filter button checks them all, the "Check with Breakwater" bulk action checks the ones selected, and `wp breakwater pending` does it from the command line (`--dry-run` lists the verdicts first). They are judged on what was saved (links, sender, repeats and the fleet list; there is no browser proof for an old comment) and spam moves to the Spam folder, where Not Spam puts it back. Comments Breakwater checked when they were posted, and comments from people who edit the site, are left alone.
+
 ## 0.4.0 (2026-11-09)
 
 * **No database query on ordinary page views.** Every request read the stored schema version, which wasn't autoloaded, so each page view on every site cost one extra query, and the copied-site check added a second. The version is now autoloaded (one schema step moves it there) and the address check reads the autoloaded `home` option unless `WP_HOME` is defined, so a page view costs Breakwater no queries.

@@ -171,6 +171,44 @@ final class Cli {
     }
 
     /**
+     * Checks pending comments nobody has checked yet (left from before Breakwater, or posted
+     * some other way) and moves spam to the Spam folder, as "Check pending with Breakwater" does
+     * on the Comments screen. Judged on what was saved: no browser checks.
+     *
+     * [--dry-run]
+     * : List the verdicts without moving or marking anything.
+     *
+     * [--format=<format>]
+     * : table or json. Default table.
+     *
+     * ## EXAMPLES
+     *
+     *     wp breakwater pending --dry-run
+     *
+     * @param list<string>          $args
+     * @param array<string, string> $assoc
+     */
+    public function pending( array $args, array $assoc ): void {
+        $dry_run = (bool) Utils\get_flag_value( $assoc, 'dry-run', false );
+        $rows    = [];
+        $out     = Pending::run( 0, $dry_run, function ( \WP_Comment $comment, Verdict $verdict ) use ( &$rows ): void {
+            $reasons = array_filter( $verdict->signals, fn ( array $signal ): bool => 0 !== (int) $signal[0] );
+            $rows[]  = [
+                'id'      => (int) $comment->comment_ID,
+                'verdict' => $verdict->spam ? 'spam' : 'clean',
+                'score'   => $verdict->score,
+                'why'     => implode( ', ', array_keys( $reasons ) ),
+                'email'   => $comment->comment_author_email,
+                'comment' => mb_substr( trim( (string) preg_replace( '/\s+/', ' ', wp_strip_all_tags( $comment->comment_content ) ) ), 0, 60 ),
+            ];
+        } );
+        if ( $rows ) {
+            Utils\format_items( (string) Utils\get_flag_value( $assoc, 'format', 'table' ), $rows, array_keys( $rows[0] ) );
+        }
+        WP_CLI::success( sprintf( '%d checked, %d spam%s.', $out['checked'], $out['spam'], $dry_run ? ' (dry run: nothing moved)' : ' moved to the Spam folder' ) );
+    }
+
+    /**
      * Scores a message without the browser checks. Nothing is logged.
      *
      * [--content=<content>]
