@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* **Links written with Gravity Forms' rich-text editor are no longer counted as spam markup.** A Paragraph field with the rich-text editor on saves its links as HTML, and Breakwater scored that as links pasted in by a bot (4 points), then counted each link twice, once in the tag and once in its text. A support request listing three videos scored 7 and was held. Those links now count as plain addresses, once each.
+* **A sender picked from a list is recognised.** Forms that ask for the sender's address as a choice ("Your Email Address" with a list of addresses) or in a text field had no sender as far as Breakwater could tell, so marking one of their entries Not spam couldn't trust that sender next time. An address picked or typed in any field now counts as the sender when the form has no email field. An email field still comes first.
 * **Check the pending comments that piled up before Breakwater.** Comments waiting for moderation from before Breakwater was installed are never checked, so a site switching from another spam service could be left with hundreds of spam comments to clear by hand. "Check pending with Breakwater" beside the Comments screen's Filter button checks them all, the "Check with Breakwater" bulk action checks the ones selected, and `wp breakwater pending` does it from the command line (`--dry-run` lists the verdicts first). They are judged on what was saved (links, sender, repeats and the fleet list; there is no browser proof for an old comment) and spam moves to the Spam folder, where Not Spam puts it back. Comments Breakwater checked when they were posted, and comments from people who edit the site, are left alone.
 
 ## 0.4.0 (2026-11-09)

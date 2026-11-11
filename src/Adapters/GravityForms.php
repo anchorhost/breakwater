@@ -184,10 +184,11 @@ final class GravityForms extends Adapter {
 
     /**
      * Entry values by field type. GF stores multi-input fields (name, address) as 1.3, 1.6, ...
+     * Paragraph fields with the rich-text editor on hold the editor's HTML: flagged as rich.
      *
      * @param array<string, mixed> $form
      * @param array<string, mixed> $entry
-     * @return list<array{type:string, label:string, value:mixed, key:string}>
+     * @return list<array{type:string, label:string, value:mixed, key:string, rich:bool}>
      */
     private static function fields( array $form, array $entry ): array {
         $out = [];
@@ -199,7 +200,7 @@ final class GravityForms extends Adapter {
                     $values[] = $value;
                 }
             }
-            $out[] = [ 'type' => (string) ( $field->type ?? '' ), 'label' => (string) ( $field->label ?? '' ), 'value' => $values, 'key' => $id ];
+            $out[] = [ 'type' => (string) ( $field->type ?? '' ), 'label' => (string) ( $field->label ?? '' ), 'value' => $values, 'key' => $id, 'rich' => ! empty( $field->useRichTextEditor ) ];
         }
         return $out;
     }

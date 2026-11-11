@@ -114,13 +114,14 @@ final class Submission {
      * Email, name and website fields fill the sender; consent, hidden and similar fields are
      * kept for recovery but never judged as the visitor's words.
      *
-     * @param list<array{type?:string, label?:string, value?:mixed, key?:string}> $fields
+     * @param list<array{type?:string, label?:string, value?:mixed, key?:string, rich?:bool}> $fields
      */
     public static function fromFields( string $source, string $form, array $fields ): self {
         $s     = self::browser( $source, $form, self::post() );
         $texts = [];
         $first = '';
         $last  = '';
+        $other = '';
         foreach ( array_slice( $fields, 0, self::MAX_FIELDS, true ) as $i => $field ) {
             if ( ! is_array( $field ) ) {
                 continue;
@@ -128,6 +129,9 @@ final class Submission {
             $type  = self::canonical( (string) ( $field['type'] ?? '' ) );
             $label = trim( wp_strip_all_tags( self::clean( (string) ( $field['label'] ?? '' ) ) ) );
             $value = self::clean( self::text( $field['value'] ?? '' ) );
+            if ( ! empty( $field['rich'] ) ) {
+                $value = self::plain( $value );
+            }
             if ( '' === $value ) {
                 continue;
             }
@@ -144,8 +148,14 @@ final class Submission {
             if ( in_array( $type, self::NOT_MESSAGE, true ) ) {
                 continue;
             }
-            if ( ( 'email' === $type && is_email( $value ) ) || ( '' === $s->email && 'text' === $type && is_email( $value ) ) ) {
+            if ( 'email' === $type && is_email( $value ) ) {
                 $s->email = '' === $s->email ? $value : $s->email;
+                continue;
+            }
+            // An address typed into a text field or picked from a list ("Your Email Address" as
+            // choices) is the sender when the form has no email field.
+            if ( 'textarea' !== $type && is_email( $value ) ) {
+                $other = '' === $other ? $value : $other;
                 continue;
             }
             if ( 'textarea' === $type && strlen( $value ) > strlen( $s->message ) ) {
@@ -163,8 +173,25 @@ final class Submission {
         if ( '' === $s->name ) {
             $s->name = trim( $first . ' ' . $last );
         }
+        if ( '' === $s->email ) {
+            $s->email = $other;
+        }
         $s->content = mb_substr( implode( "\n", $texts ), 0, self::MAX_TEXT );
         return $s;
+    }
+
+    /**
+     * What a rich-text editor saved, as the words a person wrote: each link becomes its address
+     * (after its text when that differs) and the tags go. The editor writes the HTML, so its
+     * links are not markup a bot pasted, and a link shown as its own address counts once.
+     */
+    public static function plain( string $html ): string {
+        $text = (string) preg_replace_callback( '#<a\s[^>]*?href\s*=\s*["\']?([^"\'\s>]+)[^>]*>(.*?)</a>#is', function ( array $m ): string {
+            $label = trim( wp_strip_all_tags( $m[2] ) );
+            return '' === $label || str_contains( $m[1], $label ) || str_contains( $label, $m[1] ) ? $m[1] : $label . ' ' . $m[1];
+        }, $html );
+        $text = (string) preg_replace( '#<(?:br|/p|/div|/li|/h[1-6])\b[^>]*>#i', "\n", $text );
+        return trim( html_entity_decode( wp_strip_all_tags( $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
     }
 
     /** "input_email" (Fluent Forms), "Email" and "user_email" all become "email". */
