@@ -75,6 +75,10 @@ final class Pending {
                     break 2;
                 }
             }
+            // A long command-line run would otherwise keep every comment it read in memory.
+            if ( function_exists( 'wp_cache_flush_runtime' ) ) {
+                wp_cache_flush_runtime();
+            }
         }
         return $out;
     }

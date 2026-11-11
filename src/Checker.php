@@ -24,6 +24,9 @@ final class Checker {
         'opt out', 'promote your', 'video explainer', 'ai chatbot for your website', 'virtual assistant',
     ];
 
+    /** Script injection: a person's message never holds these. */
+    public const INJECTION = '/<script|javascript:|\bon[a-z]+\s*=\s*["\'][^"\']*\(|fromCharCode|document\.cookie|<iframe|<svg[^>]*\bon/i';
+
     /** Chrome 138 shipped 2025-06-24 (version, timestamp), and a new major version every four weeks since. */
     private const CHROME_ANCHOR = [ 138, 1750723200 ];
 
@@ -243,7 +246,7 @@ final class Checker {
         } elseif ( self::botName( $name ) ) {
             $this->add( 'bot_name', 3, 'generated name' );
         }
-        if ( preg_match( '/<script|javascript:|\bon[a-z]+\s*=\s*["\'][^"\']*\(|fromCharCode|document\.cookie|<iframe|<svg[^>]*\bon/i', $text ) ) {
+        if ( preg_match( self::INJECTION, $text ) ) {
             $this->add( 'injection', 6, 'script injection attempt' );
         }
 

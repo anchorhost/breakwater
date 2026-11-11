@@ -176,7 +176,7 @@ final class Cli {
      * on the Comments screen. Judged on what was saved: no browser checks.
      *
      * [--dry-run]
-     * : List the verdicts without moving or marking anything.
+     * : List the verdicts without moving or marking any comment.
      *
      * [--format=<format>]
      * : table or json. Default table.
@@ -189,6 +189,9 @@ final class Cli {
      * @param array<string, string> $assoc
      */
     public function pending( array $args, array $assoc ): void {
+        if ( Mode::Off === Plugin::mode() ) {
+            WP_CLI::error( 'Breakwater is off on this site.' );
+        }
         $dry_run = (bool) Utils\get_flag_value( $assoc, 'dry-run', false );
         $rows    = [];
         $out     = Pending::run( 0, $dry_run, function ( \WP_Comment $comment, Verdict $verdict ) use ( &$rows ): void {
