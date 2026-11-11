@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-11-10)
 
 * **Links written with Gravity Forms' rich-text editor are no longer counted as spam markup.** A Paragraph field with the rich-text editor on saves its links as HTML, and Breakwater scored that as links pasted in by a bot (4 points), then counted each link twice, once in the tag and once in its text. A support request listing three videos scored 7 and was held. Those links now count as plain addresses, once each. Script or frame code posted into such a field is still judged as sent.
 * **A sender picked from a list is recognised.** Forms that ask for the sender's address as a choice ("Your Email Address" with a list of addresses) or in a text field had no sender as far as Breakwater could tell, so marking one of their entries Not spam couldn't trust that sender next time. An address typed into a text field, or picked in a field whose label says email, now counts as the sender when no email field gave one. An email field still comes first, and lists of addresses such as a "Department" dropdown, or the form's hidden fields, are never taken for the sender.
