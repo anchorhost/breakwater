@@ -18,6 +18,9 @@ use Breakwater\Submission;
  */
 final class FluentForms extends Adapter {
 
+    /** Log row of a clean submission we checked in this request, until Fluent saves it. */
+    private int $log_id = 0;
+
     public function source(): string { return 'fluentform'; }
     public function label(): string { return 'Fluent Forms'; }
     public function detected(): bool { return defined( 'FLUENTFORM_VERSION' ); }
@@ -25,6 +28,7 @@ final class FluentForms extends Adapter {
 
     public function register(): void {
         add_filter( 'fluentform/validation_errors', $this->check( ... ), 99, 4 );
+        add_action( 'fluentform/submission_inserted', $this->link( ... ), 10, 3 );
         add_action( 'fluentform/after_submission_status_update', $this->statusChanged( ... ), 10, 2 );
     }
 
@@ -91,6 +95,17 @@ final class FluentForms extends Adapter {
         return array_values( array_unique( $to ) );
     }
 
+    /** Link a clean entry Fluent just saved so marking it Spam later feeds back. */
+    private function link( mixed $entry_id, mixed $data = [], mixed $form = null ): void {
+        $log_id       = $this->log_id;
+        $this->log_id = 0;
+        if ( ! $log_id || ! is_numeric( $entry_id ) || ! (int) $entry_id || Release::running() || ! self::available() ) {
+            return;
+        }
+        \FluentForm\App\Helpers\Helper::setSubmissionMeta( (int) $entry_id, 'breakwater_log_id', $log_id, is_object( $form ) ? (int) ( $form->id ?? 0 ) : 0 );
+        Log::link( $log_id, (string) (int) $entry_id );
+    }
+
     /** Fluent's own status change: out of Spam releases it like ours does; into Spam counts as feedback. */
     private function statusChanged( mixed $entry_id, mixed $status = '' ): void {
         if ( Release::running() || ! is_numeric( $entry_id ) || ! is_string( $status ) || ! self::available() ) {
@@ -139,6 +154,8 @@ final class FluentForms extends Adapter {
                 $this->hold( $verdict->log_id, (int) ( $form->id ?? 0 ), array_diff_key( $data, array_flip( $secrets ) ), $verdict->reason() );
             }
             $errors['_breakwater'] = [ $this->message() ];
+        } elseif ( $verdict->log_id ) {
+            $this->log_id = $verdict->log_id;
         }
         return $errors;
     }

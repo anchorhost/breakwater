@@ -44,10 +44,13 @@ final class GravityForms extends Adapter {
         if ( ! class_exists( 'GFAPI' ) ) {
             return null;
         }
-        $entry_id = (int) $wpdb->get_var( $wpdb->prepare(
-            "SELECT entry_id FROM {$wpdb->prefix}gf_entry_meta WHERE meta_key = 'breakwater_log_id' AND meta_value = %d LIMIT 1",
-            (int) $row->id
-        ) );
+        $entry_id = (int) $row->ref;
+        if ( ! $entry_id ) {
+            $entry_id = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT entry_id FROM {$wpdb->prefix}gf_entry_meta WHERE meta_key = 'breakwater_log_id' AND meta_value = %d LIMIT 1",
+                (int) $row->id
+            ) );
+        }
         $entry = $entry_id ? \GFAPI::get_entry( $entry_id ) : null;
         $form  = is_array( $entry ) && 'trash' !== $entry['status'] ? \GFAPI::get_form( (int) $entry['form_id'] ) : null;
         if ( ! is_array( $form ) ) {
@@ -80,6 +83,7 @@ final class GravityForms extends Adapter {
     private function link( mixed $entry ): void {
         if ( is_array( $entry ) && ! empty( $entry['id'] ) && Guard::lastLogId() && function_exists( 'gform_update_meta' ) ) {
             gform_update_meta( (int) $entry['id'], 'breakwater_log_id', Guard::lastLogId() );
+            Log::link( Guard::lastLogId(), (string) (int) $entry['id'] );
         }
     }
 

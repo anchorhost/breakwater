@@ -18,8 +18,8 @@ use Breakwater\Submission;
  */
 final class Formidable extends Adapter {
 
-    /** Log row of the submission we just flagged in this request, until its entry is saved. */
-    private int $held = 0;
+    /** Log row of the submission we checked in this request, until its entry is saved. */
+    private int $log_id = 0;
 
     /** @var list<int>|null The actions Formidable's own "Not spam" window ran, while it releases. */
     private ?array $native = null;
@@ -111,17 +111,17 @@ final class Formidable extends Adapter {
     }
 
     /**
-     * Remember which log row the saved spam entry came from (the hook fires for spam entries
-     * too). Formidable's own checks may have flagged it first; it is still the entry we held.
+     * Remember which log row the saved entry came from (clean and spam entries alike, so
+     * Formidable's Spam and Not spam actions both feed back).
      */
     private function link( mixed $entry_id, mixed $form_id = 0 ): void {
-        if ( ! $this->held || ! is_numeric( $entry_id ) || Release::running() || ! class_exists( 'FrmEntry' ) ) {
+        if ( ! $this->log_id || ! is_numeric( $entry_id ) || Release::running() || ! class_exists( 'FrmEntry' ) ) {
             return;
         }
         $entry = \FrmEntry::getOne( (int) $entry_id );
-        if ( \FrmSpamEntriesHelper::is_spam( $entry ) && empty( $entry->parent_item_id ) ) {
-            Log::link( $this->held, (string) (int) $entry_id );
-            $this->held = 0;
+        if ( $entry && empty( $entry->parent_item_id ) ) {
+            Log::link( $this->log_id, (string) (int) $entry_id );
+            $this->log_id = 0;
         }
     }
 
@@ -164,14 +164,15 @@ final class Formidable extends Adapter {
         }
         $form_id = (int) ( $values['form_id'] ?? 0 );
         $form    = class_exists( 'FrmForm' ) ? \FrmForm::getOne( $form_id ) : null;
-        $verdict = $this->evaluate( Submission::fromFields( $this->source(), $form_id . ': ' . ( $form->name ?? '' ), $fields ) );
+        $verdict      = $this->evaluate( Submission::fromFields( $this->source(), $form_id . ': ' . ( $form->name ?? '' ), $fields ) );
+        $this->log_id = $verdict->log_id ?: Guard::lastLogId();
         if ( ! $verdict->act ) {
             return $errors;
         }
         if ( method_exists( 'FrmSpamEntriesHelper', 'maybe_flag_submission' ) && \FrmSpamEntriesHelper::maybe_flag_submission( $form_id, 'breakwater', $verdict->reason() ) ) {
-            $this->held = $verdict->log_id ?: Guard::lastLogId();
             return $errors; // Saved as a spam entry; the visitor sees the usual success message.
         }
+        $this->log_id   = 0;
         $errors['spam'] = $this->message();
         return $errors;
     }

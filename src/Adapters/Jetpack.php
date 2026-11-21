@@ -26,6 +26,9 @@ final class Jetpack extends Adapter {
     /** The form being submitted, handed to us just before the spam check. */
     private ?object $form = null;
 
+    /** Log row of the submission we checked in this request, until its feedback post is saved. */
+    private int $log_id = 0;
+
     /** Log row of the submission we just held in this request, until its feedback post is saved. */
     private int $held = 0;
 
@@ -249,24 +252,29 @@ final class Jetpack extends Adapter {
     }
 
     /**
-     * The held submission's feedback post is saved: link it to its row and keep what a release
-     * needs, including the visitor's post with the form's signed token (its recipients, webhooks
-     * and integrations).
+     * The feedback post is saved: link it to its row (clean and spam alike, so Jetpack's Spam and
+     * Not spam actions both feed back) and for a held one keep what a release needs, including the
+     * visitor's post with the form's signed token (its recipients, webhooks and integrations).
      */
     private function link( mixed $post_id, mixed $fields = [], mixed $is_spam = false ): void {
-        $log_id     = $this->held;
-        $this->held = 0;
-        if ( ! $log_id || true !== $is_spam || ! is_numeric( $post_id ) || ! (int) $post_id || Release::running() ) {
+        $log_id       = $this->log_id;
+        $held         = $this->held;
+        $this->log_id = 0;
+        $this->held   = 0;
+        if ( ! $log_id || ! is_numeric( $post_id ) || ! (int) $post_id || Release::running() ) {
             return;
         }
         update_post_meta( (int) $post_id, '_breakwater_log_id', $log_id );
         Log::link( $log_id, (string) (int) $post_id );
+        if ( ! $held || true !== $is_spam ) {
+            return;
+        }
         $post = array_filter(
             (array) $_POST, // phpcs:ignore WordPress.Security.NonceVerification
             fn ( $key ): bool => is_string( $key ) && ! preg_match( Submission::SKIP, $key ),
             ARRAY_FILTER_USE_KEY
         );
-        Log::stash( $log_id, [ 'post_id' => (int) $post_id, 'post' => $post, 'subject' => $this->subject, 'headers' => $this->headers ] );
+        Log::stash( $held, [ 'post_id' => (int) $post_id, 'post' => $post, 'subject' => $this->subject, 'headers' => $this->headers ] );
     }
 
     /** Jetpack's "Not spam" is a REST update of the feedback post, which resends its email. */
@@ -322,11 +330,12 @@ final class Jetpack extends Adapter {
         }
         $s        = Submission::fromFields( $this->source(), $this->formName(), $fields );
         $s->other = false;
-        $verdict  = $this->evaluate( $s );
+        $verdict      = $this->evaluate( $s );
+        $this->log_id = $verdict->log_id ?: Guard::lastLogId();
         if ( ! $verdict->act ) {
             return $is_spam;
         }
-        $this->held    = $verdict->log_id ?: Guard::lastLogId();
+        $this->held    = $this->log_id;
         $this->subject = $this->headers = '';
         return true;
     }

@@ -119,8 +119,10 @@ final class ContactForm7 extends Adapter {
         $s->other = (bool) $spam;
 
         $verdict = $this->evaluate( $s );
+        if ( $verdict->log_id ) {
+            self::$log_id = $verdict->log_id; // Links Flamingo's message (clean or spam) so its Spam/Not spam buttons feed back.
+        }
         if ( $verdict->act || $spam ) { // Held either way: keep what "Not spam" needs.
-            self::$log_id = $verdict->log_id;
             self::stash( $verdict->log_id, $contact_form, $submission );
         }
         if ( ! $verdict->act ) {
@@ -214,11 +216,12 @@ final class ContactForm7 extends Adapter {
         }
     }
 
-    /** Remember which Flamingo message a held submission was saved as. */
+    /** Remember which Flamingo message this submission was saved as. */
     private function link( mixed $result ): void {
         if ( self::$log_id && is_array( $result ) && ! empty( $result['flamingo_inbound_id'] ) ) {
             Log::link( self::$log_id, (string) (int) $result['flamingo_inbound_id'] );
         }
+        self::$log_id = 0;
     }
 
     /** Flamingo's own "Not spam" releases it like ours does; "Spam" counts as feedback. */

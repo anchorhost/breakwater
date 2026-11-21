@@ -13,7 +13,7 @@ namespace Breakwater;
  */
 final class Log {
 
-    public const DB_VERSION = 7;
+    public const DB_VERSION = 8;
 
     public static function table(): string {
         global $wpdb;
@@ -70,10 +70,12 @@ final class Log {
             KEY ip_created (ip, created_at),
             KEY content_hash (content_hash),
             KEY source_ref (source, ref),
-            KEY feedback_at (feedback_at)
+            KEY feedback_at (feedback_at),
+            KEY email (email)
         ) {$charset};" );
-        // Only once the newest column exists: a failed ALTER (a lock timeout on a big table) is tried again.
-        if ( $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM ' . $table . ' LIKE %s', 'feedback_at' ) ) ) {
+        // Only once the newest column and index exist: a failed ALTER (a lock timeout on a big table) is tried again.
+        if ( $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM ' . $table . ' LIKE %s', 'feedback_at' ) )
+            && $wpdb->get_var( $wpdb->prepare( 'SHOW INDEX FROM ' . $table . ' WHERE Key_name = %s', 'email' ) ) ) {
             // Rows marked before the column existed: when is unknown, so their own time stands in.
             $wpdb->query( "UPDATE {$table} SET feedback_at = created_at WHERE feedback != '' AND feedback_at IS NULL" );
             // Autoloaded: maybeInstall() reads it on every request, and a non-autoloaded option is
@@ -209,6 +211,12 @@ final class Log {
         $wpdb->update( self::table(), [ 'feedback' => $feedback, 'feedback_at' => gmdate( 'Y-m-d H:i:s' ) ], [ 'id' => $id ] );
     }
 
+    /** Clears an accidental "Was spam" mark on a clean row. */
+    public static function clearFeedback( int $id ): void {
+        global $wpdb;
+        $wpdb->update( self::table(), [ 'feedback' => '', 'feedback_at' => null ], [ 'id' => $id ] );
+    }
+
     /** Has the site owner reported a message from this address as spam? */
     public static function reportedSender( string $email ): bool {
         global $wpdb;
@@ -312,6 +320,15 @@ final class Log {
         global $wpdb;
         $table = self::table();
         $wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE created_at < %s", gmdate( 'Y-m-d H:i:s', time() - self::keepDays() * DAY_IN_SECONDS ) ) );
+        if ( ! wp_using_ext_object_cache() ) {
+            // Core never prunes expired transients outside upgrades; clear our spent PoW and MX caches.
+            $wpdb->query( $wpdb->prepare(
+                "DELETE a, b FROM {$wpdb->options} a
+                LEFT JOIN {$wpdb->options} b ON b.option_name = REPLACE(a.option_name, '_transient_timeout_', '_transient_')
+                WHERE a.option_name LIKE '\\_transient\\_timeout\\_breakwater\\_%' AND CAST(a.option_value AS UNSIGNED) < %d",
+                time()
+            ) );
+        }
     }
 
     private static function requestUrl(): string {

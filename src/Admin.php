@@ -80,6 +80,12 @@ final class Admin {
                 Feedback::spam( $id );
                 $note = 'marked';
                 break;
+            case 'undo_spam':
+                if ( 'ham' === $row->verdict && 'spam' === $row->feedback ) {
+                    Log::clearFeedback( $id );
+                    $note = 'unmarked';
+                }
+                break;
         }
         wp_safe_redirect( self::url( [ 'note' => $note, 'row' => $id ] ) );
         exit;
@@ -125,6 +131,7 @@ final class Admin {
         $notes   = [
             'released'    => ( $noted && $noted->outcome ? $noted->outcome : 'Marked not spam.' ) . ' Future messages from this sender get the benefit of the doubt.',
             'marked'      => 'Marked as spam.',
+            'unmarked'    => 'Spam mark cleared.',
             'mode'        => 'Mode saved.',
             'send_failed' => 'The email could not be sent. Check the site can send mail, then try again.',
         ];
@@ -204,6 +211,8 @@ final class Admin {
                                     <span><?php echo self::rowLink( $row, 'not_spam', 'blocked' === $row->action ? 'Not spam, deliver it' : 'Not spam', 'bw-release' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
                                 <?php elseif ( Api::canMarkSpam( $row ) ) : ?>
                                     <span><?php echo self::rowLink( $row, 'is_spam', 'Was spam' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+                                <?php elseif ( 'was_spam' === Api::state( $row ) ) : ?>
+                                    <span><?php echo self::rowLink( $row, 'undo_spam', 'Undo spam mark' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
                                 <?php endif; ?>
                                 <?php if ( $row->delivered_at ) : ?>
                                     <span class="bw-muted"><?php echo esc_html( $row->outcome ?: 'Delivered.' ); ?></span>

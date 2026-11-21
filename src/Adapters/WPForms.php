@@ -171,8 +171,8 @@ final class WPForms extends Adapter {
         $s->other = ! empty( $process->spam_reason );
 
         $verdict = $this->evaluate( $s );
-        if ( $verdict->act || $s->other ) {
-            self::$log_id = $verdict->log_id;
+        if ( $verdict->log_id ) {
+            self::$log_id = $verdict->log_id; // Links Pro entries (clean or spam) so its Spam/Not spam buttons feed back.
         }
         if ( ! $verdict->act ) {
             return;
