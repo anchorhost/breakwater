@@ -15,6 +15,7 @@ final class Front {
         add_action( 'rest_api_init', [ self::class, 'routes' ] );
         add_action( 'wp_enqueue_scripts', [ self::class, 'enqueue' ] );
         add_action( 'login_enqueue_scripts', [ self::class, 'enqueue' ] );
+        Assets::registerExclusions();
     }
 
     public static function routes(): void {

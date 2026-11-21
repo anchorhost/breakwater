@@ -14,15 +14,18 @@ Each submission is scored. At 5 points it is spam (`breakwater_threshold`).
 | No browser proof | 6 | The script never ran: a bot posting straight to the form |
 | Proof of work forged or wrong | 8 | |
 | Proof of work reused / not finished / expired | 3 / 2 / 1 | |
-| Automated browser (`navigator.webdriver`) | 4 | |
+| Automated browser (`navigator.webdriver` / `HeadlessChrome` client hints) | 4 / 6 | |
+| Client hints contradict the user agent / missing on Chrome 90+ | 4 / 3 | Version drift stays logged at 0 |
+| Missing fetch metadata / missing `Accept-Language` / script saw another user agent | 3 | On HTTPS with a current browser user agent |
 | Bot user agent (curl, python, HeadlessChrome, ...) | 4 | |
-| Sent under 2.5s after page load / no clicks or keys | 3 / 2 | |
+| Sent under 2.5s after page load (or under 1s after focusing) / no clicks or keys / desktop filled without typing | 3 / 2 / 2 | |
 | BBCode or HTML links | 4 | |
-| 3+ links / 1-2 links | 3 / 1 | |
+| Mixed-script characters inside a word | 4 | Homoglyph obfuscation |
+| 3+ links / 1-2 links / URL shortener or messaging redirect | 3 / 1 / 2 | |
 | Link in the name field | 3 | |
 | Message mostly in a script the site doesn't use | 4 | Skipped for sites in those languages |
-| Spam phrases | 1 each, max 3 | `breakwater_phrases` |
-| Throwaway email domain / domain can't receive mail | 3 | List in `data/disposable-domains.txt` (CC0) |
+| Spam phrases | 1 each, max 3 | Whole words; `breakwater_phrases` |
+| Throwaway email domain (or subdomain) / domain can't receive mail | 3 | List in `data/disposable-domains.txt` (CC0) |
 | Greets the site by its address / a link to another site carrying it / names it | 4 / 3 / 1 | Mail-merge outreach ("Hello Example Com"); the strongest counts. Skipped when the site's name is its address |
 | Same message already caught as spam today | 3 | Messages marked as spam count too |
 | Sender reported as spam before | 5 | Until they are marked not spam |
@@ -37,15 +40,12 @@ The proof of work is stateless and cache-safe: the page carries only the endpoin
 
 The proof travels in hidden fields added to the form and, as a fallback, in two first-party cookies (`bw_token`, `bw_meta`; SameSite=Lax, 12 hours). The cookies matter for form plugins that post their own payload instead of the form's inputs (Ninja Forms, Constant Contact, MailPoet).
 
-**Logged, not scored yet.** Some checks are recorded on the log row at 0 points while there is too little data to weigh them. They don't change the score or appear as reasons, but `wp breakwater log` lists them:
+**Logged, not scored yet.** Some checks are recorded on the log row at 0 points because real browsers occasionally trip them. They don't change the score or appear as reasons, but `wp breakwater log` lists them:
 
 | Signal | What it notices |
 |---|---|
-| `stale_browser` | Chrome 12 or more versions old. Over half of fleet form spam claims one; most people are within a version of current |
-| `no_fetch_metadata` | A browser that always sends `Sec-Fetch-*` on secure pages (Chrome 80+, Firefox 90+, Safari 16.4+) sent none |
-| `no_language` | No `Accept-Language`, which every browser sends |
-| `client_hints` | Chromium's client hints contradict the user agent (version, platform, mobile), name HeadlessChrome, are missing from Chrome 90+, or come from a browser that never sends them |
-| `agent_mismatch` | The page's script saw a different user agent than the server received |
+| `stale_browser` | Chrome 12 or more versions old. Over half of fleet form spam claims one, but a few percent of real visitors still run old Chrome |
+| `client_hints` (version drift) | Chromium's `Sec-CH-UA` major version differs from `Chrome/N` in the user agent by more than 2 versions |
 
 The headers behind them are kept with the row's payload.
 

@@ -98,15 +98,18 @@ final class CleanTalkWatch {
         if ( Release::running() || Guard::trusted() || str_ends_with( (string) ( $_SERVER['SCRIPT_NAME'] ?? '' ), 'wp-login.php' ) ) {
             return;
         }
-        // REST calls and server-to-server posts (mail and payment webhooks) aren't form
-        // submissions: a browser sending a form always says where it came from.
-        if ( ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || ( empty( $_SERVER['HTTP_REFERER'] ) && empty( $_SERVER['HTTP_ORIGIN'] ) ) ) {
+        if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
             return;
         }
         $post   = wp_unslash( $_POST ); // phpcs:ignore WordPress.Security.NonceVerification
         $action = is_string( $post['action'] ?? null ) ? sanitize_key( $post['action'] ) : '';
         if ( preg_match( '/^(apbct|cleantalk|ct_|heartbeat)/', $action ) ) {
             return; // CleanTalk's own checks (the iframe cover, bot detector) carry no submission.
+        }
+        // Server-to-server posts (mail and payment webhooks) aren't form submissions, unless the
+        // action is a known form AJAX handler (direct bots posting to forms often omit Referer).
+        if ( ! isset( self::ACTIONS[ $action ] ) && empty( $_SERVER['HTTP_REFERER'] ) && empty( $_SERVER['HTTP_ORIGIN'] ) ) {
+            return;
         }
         $source = self::ACTIONS[ $action ] ?? ( str_ends_with( (string) ( $_SERVER['SCRIPT_NAME'] ?? '' ), 'wp-comments-post.php' ) ? 'comment' : 'request' );
         $form   = '' !== $action ? $action : (string) wp_parse_url( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), PHP_URL_PATH );

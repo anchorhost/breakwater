@@ -92,10 +92,14 @@ final class Elementor extends Adapter {
     }
 
     public function recipients( string $form ): array {
+        static $cache = [];
+        if ( array_key_exists( $form, $cache ) ) {
+            return $cache[ $form ];
+        }
         global $wpdb;
         $element = sanitize_key( (string) strtok( $form, ':' ) );
         if ( '' === $element || ! self::available() ) {
-            return [];
+            return $cache[ $form ] = [];
         }
         $posts = $wpdb->get_col( $wpdb->prepare(
             "SELECT m.post_id FROM {$wpdb->postmeta} m JOIN {$wpdb->posts} p ON p.ID = m.post_id WHERE m.meta_key = '_elementor_data' AND p.post_type != 'revision' AND m.meta_value LIKE %s LIMIT 5",
@@ -105,10 +109,10 @@ final class Elementor extends Adapter {
             $found = self::form( (int) $post_id, $element );
             if ( $found ) {
                 $settings = $found['settings'];
-                return in_array( 'email', (array) ( $settings['submit_actions'] ?? [] ), true ) ? self::emails( (string) ( $settings['email_to'] ?? '' ) ) : [];
+                return $cache[ $form ] = in_array( 'email', (array) ( $settings['submit_actions'] ?? [] ), true ) ? self::emails( (string) ( $settings['email_to'] ?? '' ) ) : [];
             }
         }
-        return [];
+        return $cache[ $form ] = [];
     }
 
     /**
