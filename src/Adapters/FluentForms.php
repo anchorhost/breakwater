@@ -118,7 +118,8 @@ final class FluentForms extends Adapter {
         }
         if ( 'spam' === $status ) {
             Feedback::spam( $log_id );
-        } elseif ( in_array( $status, [ 'unread', 'read' ], true ) && null === $row->delivered_at ) {
+        } elseif ( in_array( $status, [ 'unread', 'read' ], true ) && null === $row->delivered_at
+            && ( 'blocked' === $row->action || 'spam' === $row->other_verdict ) ) {
             Release::run( $row );
         }
     }

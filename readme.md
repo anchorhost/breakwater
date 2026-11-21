@@ -18,7 +18,7 @@ Each submission is scored. At 5 points it is spam (`breakwater_threshold`).
 | Client hints contradict the user agent / missing on Chrome 90+ | 4 / 3 | Version drift stays logged at 0 |
 | Missing fetch metadata / missing `Accept-Language` / script saw another user agent | 3 | On HTTPS with a current browser user agent |
 | Bot user agent (curl, python, HeadlessChrome, ...) | 4 | |
-| Sent under 2.5s after page load (or under 1s after focusing) / no clicks or keys / desktop filled without typing | 3 / 2 / 2 | |
+| Sent under 2.5s after page load / no clicks or keys / desktop filled without typing | 3 / 2 / 2 | |
 | BBCode or HTML links | 4 | |
 | Mixed-script characters inside a word | 4 | Homoglyph obfuscation |
 | 3+ links / 1-2 links / URL shortener or messaging redirect | 3 / 1 / 2 | |

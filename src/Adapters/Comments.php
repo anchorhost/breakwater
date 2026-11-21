@@ -111,7 +111,7 @@ final class Comments extends Adapter {
             [ 'type' => 'url', 'label' => 'url', 'value' => (string) ( $comment['comment_author_url'] ?? '' ) ],
             [ 'type' => 'textarea', 'label' => 'comment', 'value' => (string) ( $comment['comment_content'] ?? '' ) ],
         ] );
-        $s->content = trim( (string) ( $comment['comment_content'] ?? '' ) . "\n" . $s->url );
+        $s->content = trim( $s->message . "\n" . $s->url );
         return $s;
     }
 }

@@ -36,6 +36,7 @@ $cases = [
     'hints disagree on the version'          => [ $chrome, [ 'ch_ua' => '"Chromium";v="131"' ] + $hints, $meta( $chrome ), [ 'client_hints' ] ],
     'hints within 2 versions (update drift)' => [ $chrome, [ 'ch_ua' => '"Chromium";v="155"' ] + $hints, $meta( $chrome ), [] ],
     'hints say Linux, agent says Windows'    => [ $chrome, [ 'ch_platform' => '"Linux"' ] + $hints, $meta( $chrome ), [ 'client_hints' ] ],
+    'platform mismatch beats version drift'  => [ $old, [ 'ch_ua' => '"Chromium";v="154"', 'ch_platform' => '"Linux"' ] + $hints, $meta( $old ), [ 'client_hints', 'stale_browser' ] ],
     'Android phone'                          => [ $android, [ 'ch_ua' => '"Chromium";v="154"', 'ch_mobile' => '?1', 'ch_platform' => '"Android"' ] + $fetch, $meta( $android ), [] ],
     'hints say desktop, agent says phone'    => [ $android, [ 'ch_ua' => '"Chromium";v="154"', 'ch_mobile' => '?0', 'ch_platform' => '"Android"' ] + $fetch, $meta( $android ), [ 'client_hints' ] ],
     'Android web view without hints'         => [ $webview, $fetch, $meta( $webview ), [] ],

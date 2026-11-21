@@ -92,16 +92,6 @@ final class Checker {
             Proof::Ok       => null,
         };
 
-        // Server-side lower bound: the challenge is fetched when someone focuses a field, so
-        // submitting a long message within the same second cannot be a person typing.
-        if ( Proof::Ok === $proof && ! $this->s->continued ) {
-            $issued = Challenge::issuedAt( $this->s->token );
-            if ( null !== $issued && time() - $issued < 1
-                && ( mb_strlen( $this->s->message ) >= 60 || (int) ( $this->s->meta['t'] ?? 0 ) >= 40 ) ) {
-                $this->add( 'too_fast', 3, 'sent under a second after focusing the form' );
-            }
-        }
-
         $meta = $this->s->meta;
         if ( null === $meta ) {
             return;
@@ -109,7 +99,7 @@ final class Checker {
         $elapsed = (int) ( $meta['e'] ?? 0 );
         $touches = (int) ( $meta['i'] ?? 0 ) + (int) ( $meta['k'] ?? 0 );
         // A visitor resuming a saved form has already done the typing, so time on this page says little.
-        if ( ! isset( $this->signals['too_fast'] ) && ( ! isset( $meta['e'] ) || $elapsed < 2500 ) && ! $this->s->continued ) {
+        if ( ( ! isset( $meta['e'] ) || $elapsed < 2500 ) && ! $this->s->continued ) {
             $this->add( 'too_fast', 3, isset( $meta['e'] ) ? sprintf( 'sent %.1fs after the page loaded', $elapsed / 1000 ) : 'no elapsed time reported' );
         }
         if ( 0 === $touches && ! $this->s->continued ) {
@@ -140,6 +130,10 @@ final class Checker {
         }
         if ( (int) $meta['v'] >= 3 && '' !== $agent && strlen( $agent ) < 300 && ! is_string( $meta['u'] ?? null ) ) {
             return false;
+        }
+        // 0-point client-hints version drift happens on real browsers and should not escalate to no_js.
+        if ( isset( $inconsistencies['client_hints'] ) && str_starts_with( $inconsistencies['client_hints'], 'client hints say Chrome ' ) ) {
+            unset( $inconsistencies['client_hints'] );
         }
         return ! array_intersect_key( $inconsistencies, array_flip( [ 'no_fetch_metadata', 'no_language', 'client_hints', 'headless_browser', 'agent_mismatch' ] ) );
     }
@@ -213,12 +207,12 @@ final class Checker {
             $platform = self::platform( $agent );
             $said     = trim( $headers['ch_platform'] ?? '', '" ' );
             $mobile   = $headers['ch_mobile'] ?? '';
-            if ( preg_match( '/"Chromium";\s*v="(\d+)"/', $hints, $m ) && abs( (int) $m[1] - $browser['version'] ) > 2 ) {
-                $out['client_hints'] = sprintf( 'client hints say Chrome %d, the user agent %d', $m[1], $browser['version'] );
-            } elseif ( '' !== $said && '' !== $platform && strcasecmp( $said, $platform ) !== 0 ) {
+            if ( '' !== $said && '' !== $platform && strcasecmp( $said, $platform ) !== 0 ) {
                 $out['client_hints'] = sprintf( 'client hints say %s, the user agent %s', $said, $platform );
             } elseif ( '' !== $mobile && ( '?1' === $mobile ) !== str_contains( $agent, 'Mobile' ) ) {
                 $out['client_hints'] = '?1' === $mobile ? 'client hints say mobile, the user agent desktop' : 'client hints say desktop, the user agent mobile';
+            } elseif ( preg_match( '/"Chromium";\s*v="(\d+)"/', $hints, $m ) && abs( (int) $m[1] - $browser['version'] ) > 2 ) {
+                $out['client_hints'] = sprintf( 'client hints say Chrome %d, the user agent %d', $m[1], $browser['version'] );
             }
         }
 
@@ -280,8 +274,9 @@ final class Checker {
         }
 
         // Strip invisible zero-width characters spammers insert to evade phrase and link checks.
-        $clean = (string) preg_replace( '/[\x{200B}-\x{200D}\x{FEFF}\x{00AD}]/u', '', $text );
-        if ( preg_match( '/\b(?=\p{L}*\p{Latin})(?=\p{L}*[\p{Cyrillic}\p{Greek}])\p{L}+\b/u', $clean ) ) {
+        $utf8  = function_exists( 'wp_check_invalid_utf8' ) ? wp_check_invalid_utf8( $text, true ) : $text;
+        $clean = preg_replace( '/[\x{200B}-\x{200D}\x{FEFF}\x{00AD}]/u', '', $utf8 ) ?? $utf8;
+        if ( preg_match( '/(?<![\p{L}\p{N}])(?:(?=[\p{L}\p{N}]*\p{Latin})(?=[\p{L}\p{N}]*\p{Cyrillic})[\p{L}\p{N}]{3,}|(?=\p{L}*\p{Latin})(?=\p{L}*\p{Greek})\p{L}{4,})(?![\p{L}\p{N}])/u', $clean ) ) {
             $this->add( 'obfuscated_text', 4, 'mixed-script characters inside a word' );
         }
 
@@ -312,7 +307,7 @@ final class Checker {
 
         $hits = array_values( array_filter(
             (array) apply_filters( 'breakwater_phrases', self::PHRASES ),
-            fn ( $phrase ): bool => is_string( $phrase ) && '' !== $phrase && (bool) preg_match( '/(?<![\p{L}\p{N}])' . preg_quote( $phrase, '/' ) . '(?![\p{L}\p{N}])/iu', $clean )
+            fn ( $phrase ): bool => is_string( $phrase ) && '' !== $phrase && (bool) preg_match( '/(?<![\p{L}\p{N}])' . preg_quote( $phrase, '/' ) . '(?:s|es|ing)?(?![\p{L}\p{N}])/iu', $clean )
         ) );
         if ( $hits ) {
             $this->add( 'phrases', min( 3, count( $hits ) ), implode( ', ', array_slice( $hits, 0, 5 ) ) );

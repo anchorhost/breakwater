@@ -33,19 +33,6 @@ final class Challenge {
     }
 
     /**
-     * When a verified challenge was issued, from its signed salt. Null when unreadable.
-     */
-    public static function issuedAt( string $token ): ?int {
-        $data = json_decode( base64_decode( $token, true ) ?: '', true );
-        if ( ! is_array( $data ) || ! is_string( $data['salt'] ?? null ) ) {
-            return null;
-        }
-        $parts  = explode( '.', $data['salt'] );
-        $issued = 3 === count( $parts ) ? (int) $parts[1] : 0;
-        return $issued > 0 ? $issued : null;
-    }
-
-    /**
      * @param string $token Base64 JSON from the browser: salt, challenge, signature, number.
      */
     public static function verify( string $token ): Proof {

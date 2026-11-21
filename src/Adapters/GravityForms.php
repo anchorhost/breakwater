@@ -22,6 +22,9 @@ use Breakwater\Submission;
  */
 final class GravityForms extends Adapter {
 
+    /** Log row of the entry we checked in this request, until GF saves it. */
+    private int $log_id = 0;
+
     public function source(): string { return 'gravityforms'; }
     public function label(): string { return 'Gravity Forms'; }
     public function detected(): bool { return class_exists( 'GFForms' ); }
@@ -79,11 +82,13 @@ final class GravityForms extends Adapter {
         return array_values( array_unique( $to ) );
     }
 
-    /** Remember which log row the saved entry came from. */
+    /** Remember which log row the saved entry came from (reset after linking so secondary entries don't overwrite it). */
     private function link( mixed $entry ): void {
-        if ( is_array( $entry ) && ! empty( $entry['id'] ) && Guard::lastLogId() && function_exists( 'gform_update_meta' ) ) {
-            gform_update_meta( (int) $entry['id'], 'breakwater_log_id', Guard::lastLogId() );
-            Log::link( Guard::lastLogId(), (string) (int) $entry['id'] );
+        $log_id       = $this->log_id;
+        $this->log_id = 0;
+        if ( is_array( $entry ) && ! empty( $entry['id'] ) && $log_id && function_exists( 'gform_update_meta' ) ) {
+            gform_update_meta( (int) $entry['id'], 'breakwater_log_id', $log_id );
+            Log::link( $log_id, (string) (int) $entry['id'] );
         }
     }
 
@@ -120,7 +125,8 @@ final class GravityForms extends Adapter {
         $s->other     = (bool) $is_spam;
         $s->continued = self::resumed( $form_id );
 
-        $verdict = $this->evaluate( $s );
+        $verdict      = $this->evaluate( $s );
+        $this->log_id = $verdict->log_id ?: Guard::lastLogId();
         if ( ! $verdict->act ) {
             return (bool) $is_spam;
         }

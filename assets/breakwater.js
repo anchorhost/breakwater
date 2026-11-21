@@ -51,9 +51,9 @@
 		if ( event.target && event.target.closest && event.target.closest( 'form button, form [type="submit"], form [type="button"]' ) ) {
 			carry();
 		}
-		// A click on something that sends a protected form: fetch a fresh proof for the next send,
+		// A click on something that sends a form: fetch a fresh proof for the next send,
 		// since AJAX forms never fire a submit event we could hook.
-		if ( event.target && event.target.closest && event.target.closest( 'form[data-bw] button, form[data-bw] [type="submit"], form[data-bw] [role="button"]' ) && ( token || solving ) ) {
+		if ( event.target && event.target.closest && event.target.closest( 'button, [type="submit"], [role="button"]' ) && ( token || solving ) ) {
 			setTimeout( refresh, 3000 );
 		}
 	}, { capture: true, passive: true } );
@@ -348,7 +348,7 @@
 	// The token was just used. The cookie keeps it until the replacement is ready, so a
 	// request still on its way is never sent without one.
 	function spent() {
-		setTimeout( refresh, 500 );
+		setTimeout( refresh, 1500 );
 	}
 
 	function refresh() {
@@ -360,9 +360,9 @@
 	}
 
 	// Returning to a form through the browser's Back button (bfcache) would otherwise keep the
-	// spent token from the previous submit.
+	// spent token from the previous submit (in memory or in the form's hidden input).
 	window.addEventListener( 'pageshow', function ( event ) {
-		if ( event.persisted && token ) {
+		if ( event.persisted && ( token || document.querySelector( 'form[data-bw] input[name="bw_token"][value]:not([value=""])' ) ) ) {
 			refresh();
 		}
 	} );
