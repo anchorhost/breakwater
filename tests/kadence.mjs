@@ -17,8 +17,23 @@ const messages = {
 	spammer: [ 'SEO Expert', `seo.expert+${ stamp }@mailinator.com`, 'Our SEO services and link building will rank your website on the first page of Google. https://a.xyz https://b.xyz https://c.xyz' ],
 };
 
+function humanContext( browser ) {
+	const major = ( browser.version() || '154' ).split( '.' )[ 0 ];
+	return {
+		userAgent: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${ major }.0.0.0 Safari/537.36`,
+		locale: 'en-US',
+		extraHTTPHeaders: {
+			'Accept-Language': 'en-US,en;q=0.9',
+			'Sec-CH-UA': `"Chromium";v="${ major }", "Google Chrome";v="${ major }", "Not=A?Brand";v="24"`,
+			'Sec-CH-UA-Mobile': '?0',
+			'Sec-CH-UA-Platform': '"macOS"',
+		},
+		ignoreHTTPSErrors: true,
+	};
+}
+
 async function run( browser, who, label, fast ) {
-	const context = await browser.newContext( { ignoreHTTPSErrors: true, ...( fast ? {} : { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36' } ) } );
+	const context = await browser.newContext( fast ? { ignoreHTTPSErrors: true } : humanContext( browser ) );
 	const page = await context.newPage();
 	const before = Number( lastLog().id || 0 );
 	await page.goto( base + '/ctct/', { waitUntil: 'load' } );

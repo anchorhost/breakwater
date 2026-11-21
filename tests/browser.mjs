@@ -8,8 +8,22 @@ const { chromium } = require( process.env.PLAYWRIGHT || 'playwright' );
 
 const base = process.argv[ 2 ] || 'https://protect.localhost';
 const wpPath = process.env.WP_PATH || `${ process.env.HOME }/Cove/Sites/protect.localhost/public`;
-const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
 const stamp = Date.now().toString( 36 );
+
+function humanContext( browser ) {
+	const major = ( browser.version() || '154' ).split( '.' )[ 0 ];
+	return {
+		userAgent: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${ major }.0.0.0 Safari/537.36`,
+		locale: 'en-US',
+		extraHTTPHeaders: {
+			'Accept-Language': 'en-US,en;q=0.9',
+			'Sec-CH-UA': `"Chromium";v="${ major }", "Google Chrome";v="${ major }", "Not=A?Brand";v="24"`,
+			'Sec-CH-UA-Mobile': '?0',
+			'Sec-CH-UA-Platform': '"macOS"',
+		},
+		ignoreHTTPSErrors: true,
+	};
+}
 
 const people = {
 	human: { name: 'Jane Smith', email: `jane+${ stamp }@gmail.com`, message: `Hi there, I'd like a quote for a 12x16 deck with composite boards. We're in Lititz, available weekdays after 3. (${ stamp })` },
@@ -37,7 +51,7 @@ async function run( browser, who, key, options = {} ) {
 	const tag = ( options.label || who ).replace( /[^a-z]/g, '' );
 	const person = { ...people[ who ], subject: 'Quote', login: ( tag + stamp + key ).replace( /[^a-z0-9]/g, '' ) };
 	person.email = person.email.replace( '@', `.${ tag }${ key.replace( /[^a-z]/g, '' ) }@` );
-	const context = await browser.newContext( options.context || { userAgent: UA, ignoreHTTPSErrors: true } );
+	const context = await browser.newContext( options.context || humanContext( browser ) );
 	const page = await context.newPage();
 	const before = lastLog().id || 0;
 	await page.goto( base + form.url, { waitUntil: 'load' } );

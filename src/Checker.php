@@ -13,7 +13,10 @@ final class Checker {
     public const THRESHOLD = 5;
 
     /** Signals only automation produces: no person trips them, so they can be acted on alone. */
-    public const CERTAIN = [ 'honeypot', 'no_js', 'pow_invalid', 'webdriver', 'injection' ];
+    public const CERTAIN = [ 'honeypot', 'no_js', 'pow_invalid', 'webdriver', 'headless_browser', 'injection' ];
+
+    /** URL shorteners and messaging redirects commonly used to hide spam destinations. */
+    private const SHORT_LINKS = '#(?<![\w.-])(?:bit\.ly|tinyurl\.com|rb\.gy|cutt\.ly|shorturl\.at|is\.gd|rebrand\.ly|ow\.ly|t\.me|wa\.me)/[^\s<>"\']+#i';
 
     public const PHRASES = [
         'seo services', 'backlink', 'first page of google', 'page 1 of google', 'rank your website', 'ranking on google',
@@ -48,8 +51,9 @@ final class Checker {
     public static function check( Submission $s, bool $with_browser = true ): Verdict {
         $checker = new self( $s );
         if ( $with_browser ) {
-            $checker->browser();
-            $checker->consistency();
+            $inconsistencies = self::inconsistencies( $s->agent, $s->headers, $s->meta, time() );
+            $checker->browser( $inconsistencies );
+            $checker->consistency( $inconsistencies );
         }
         $checker->agent();
         $checker->content();
@@ -70,21 +74,33 @@ final class Checker {
         $this->signals[ $code ] = [ $points, $detail ];
     }
 
-    private function browser(): void {
+    /** @param array<string, string> $inconsistencies */
+    private function browser( array $inconsistencies ): void {
         if ( '' !== $this->s->trap ) {
             $this->add( 'honeypot', 10, 'hidden field filled' );
         }
-        match ( Challenge::verify( $this->s->token ) ) {
-            // No script ran at all: almost always a bot posting straight to the form.
-            // Script ran but the work was not done yet (or the REST API is blocked): weaker.
-            Proof::Missing => null === $this->s->meta
-                ? $this->add( 'no_js', 6, 'no browser proof' )
-                : $this->add( 'pow_pending', 2, 'proof of work not finished' ),
+        $proof = Challenge::verify( $this->s->token );
+        match ( $proof ) {
+            // No script ran at all (or a forged bw_meta with missing/contradicting headers): bot posting straight to the form.
+            // Script ran from a real browser but the work was not done yet (or the REST API is blocked): weaker.
+            Proof::Missing => self::genuineMeta( $this->s->meta, $this->s->agent, $inconsistencies )
+                ? $this->add( 'pow_pending', 2, 'proof of work not finished' )
+                : $this->add( 'no_js', 6, 'no browser proof' ),
             Proof::Malformed, Proof::Forged, Proof::Wrong => $this->add( 'pow_invalid', 8, 'proof of work invalid' ),
             Proof::Replayed => $this->add( 'pow_replayed', 3, 'proof of work reused' ),
             Proof::Expired  => $this->add( 'pow_expired', 1, 'proof of work older than 12 hours' ),
             Proof::Ok       => null,
         };
+
+        // Server-side lower bound: the challenge is fetched when someone focuses a field, so
+        // submitting a long message within the same second cannot be a person typing.
+        if ( Proof::Ok === $proof && ! $this->s->continued ) {
+            $issued = Challenge::issuedAt( $this->s->token );
+            if ( null !== $issued && time() - $issued < 1
+                && ( mb_strlen( $this->s->message ) >= 60 || (int) ( $this->s->meta['t'] ?? 0 ) >= 40 ) ) {
+                $this->add( 'too_fast', 3, 'sent under a second after focusing the form' );
+            }
+        }
 
         $meta = $this->s->meta;
         if ( null === $meta ) {
@@ -93,8 +109,8 @@ final class Checker {
         $elapsed = (int) ( $meta['e'] ?? 0 );
         $touches = (int) ( $meta['i'] ?? 0 ) + (int) ( $meta['k'] ?? 0 );
         // A visitor resuming a saved form has already done the typing, so time on this page says little.
-        if ( $elapsed > 0 && $elapsed < 2500 && ! $this->s->continued ) {
-            $this->add( 'too_fast', 3, sprintf( 'sent %.1fs after the page loaded', $elapsed / 1000 ) );
+        if ( ! isset( $this->signals['too_fast'] ) && ( ! isset( $meta['e'] ) || $elapsed < 2500 ) && ! $this->s->continued ) {
+            $this->add( 'too_fast', 3, isset( $meta['e'] ) ? sprintf( 'sent %.1fs after the page loaded', $elapsed / 1000 ) : 'no elapsed time reported' );
         }
         if ( 0 === $touches && ! $this->s->continued ) {
             $this->add( 'no_interaction', 2, 'no clicks, taps or keys' );
@@ -102,15 +118,50 @@ final class Checker {
         if ( ! empty( $meta['w'] ) ) {
             $this->add( 'webdriver', 4, 'automated browser' );
         }
+        // Desktop browser automation (Playwright fill(), DevTools insertText) puts text straight
+        // into a textarea without firing keydown. Mobile is skipped (iOS voice dictation does this).
+        $typed = (int) ( $meta['t'] ?? 0 );
+        $keys  = (int) ( $meta['k'] ?? 0 );
+        if ( $typed >= 50 && 0 === $keys && ! $this->s->continued && ! preg_match( '/Mobile|Android|iPhone|iPad|iPod/i', $this->s->agent ) ) {
+            $this->add( 'filled_without_keys', 2, 'message filled without typing' );
+        }
     }
 
     /**
-     * Does the browser match what its user agent claims? Logged at 0 points until the
-     * log rows show what each is worth.
+     * Whether bw_meta looks like it came from our script in a real browser, rather than a bot
+     * posting a stub bw_meta to turn no_js (6) into pow_pending (2).
+     *
+     * @param array<string, mixed>|null $meta
+     * @param array<string, string>     $inconsistencies
      */
-    private function consistency(): void {
-        foreach ( self::inconsistencies( $this->s->agent, $this->s->headers, $this->s->meta, time() ) as $code => $detail ) {
-            $this->add( $code, 0, $detail );
+    private static function genuineMeta( ?array $meta, string $agent, array $inconsistencies ): bool {
+        if ( null === $meta || (int) ( $meta['v'] ?? 0 ) < 1 ) {
+            return false;
+        }
+        if ( (int) $meta['v'] >= 3 && '' !== $agent && strlen( $agent ) < 300 && ! is_string( $meta['u'] ?? null ) ) {
+            return false;
+        }
+        return ! array_intersect_key( $inconsistencies, array_flip( [ 'no_fetch_metadata', 'no_language', 'client_hints', 'headless_browser', 'agent_mismatch' ] ) );
+    }
+
+    /**
+     * Does the browser match what its user agent claims? Signals verified at 0% false positives
+     * in fleet telemetry are scored; stale_browser and client-hints version drift stay at 0.
+     *
+     * @param array<string, string> $inconsistencies
+     */
+    private function consistency( array $inconsistencies ): void {
+        foreach ( $inconsistencies as $code => $detail ) {
+            $points = match ( $code ) {
+                'headless_browser'  => 6,
+                'no_fetch_metadata' => 3,
+                'no_language'       => 3,
+                'agent_mismatch'    => 3,
+                'client_hints'      => str_starts_with( $detail, 'client hints say Chrome ' ) ? 0
+                    : ( str_starts_with( $detail, 'no client hints' ) ? 3 : 4 ),
+                default             => 0,
+            };
+            $this->add( $code, $points, $detail );
         }
     }
 
@@ -153,7 +204,7 @@ final class Checker {
 
         $hints = $headers['ch_ua'] ?? '';
         if ( str_contains( $hints, 'HeadlessChrome' ) ) {
-            $out['client_hints'] = 'client hints name HeadlessChrome';
+            $out['headless_browser'] = 'client hints name HeadlessChrome';
         } elseif ( '' !== $hints && $browser && 'chromium' !== $browser['engine'] ) {
             $out['client_hints'] = sprintf( 'client hints from %s, which never sends them', $browser['name'] );
         } elseif ( '' === $hints && $https && $browser && 'chromium' === $browser['engine'] && $browser['version'] >= 90 && ! str_contains( $agent, '; wv)' ) ) {
@@ -162,7 +213,7 @@ final class Checker {
             $platform = self::platform( $agent );
             $said     = trim( $headers['ch_platform'] ?? '', '" ' );
             $mobile   = $headers['ch_mobile'] ?? '';
-            if ( preg_match( '/"Chromium";\s*v="(\d+)"/', $hints, $m ) && (int) $m[1] !== $browser['version'] ) {
+            if ( preg_match( '/"Chromium";\s*v="(\d+)"/', $hints, $m ) && abs( (int) $m[1] - $browser['version'] ) > 2 ) {
                 $out['client_hints'] = sprintf( 'client hints say Chrome %d, the user agent %d', $m[1], $browser['version'] );
             } elseif ( '' !== $said && '' !== $platform && strcasecmp( $said, $platform ) !== 0 ) {
                 $out['client_hints'] = sprintf( 'client hints say %s, the user agent %s', $said, $platform );
@@ -228,16 +279,25 @@ final class Checker {
             return;
         }
 
+        // Strip invisible zero-width characters spammers insert to evade phrase and link checks.
+        $clean = (string) preg_replace( '/[\x{200B}-\x{200D}\x{FEFF}\x{00AD}]/u', '', $text );
+        if ( preg_match( '/\b(?=\p{L}*\p{Latin})(?=\p{L}*[\p{Cyrillic}\p{Greek}])\p{L}+\b/u', $clean ) ) {
+            $this->add( 'obfuscated_text', 4, 'mixed-script characters inside a word' );
+        }
+
         // Links to the site itself (consent text, tracking fields, page URLs) say nothing.
-        $outside = self::foreignLinks( $text );
-        $hrefs   = preg_match_all( '/<a\s[^>]*href\s*=\s*["\']?([^"\'\s>]+)/i', $text, $m ) ? $m[1] : [];
-        if ( preg_match( '/\[(url|link)[=\]]/i', $text ) || self::foreignLinks( implode( ' ', $hrefs ) ) ) {
+        $outside = self::foreignLinks( $clean );
+        $hrefs   = preg_match_all( '/<a\s[^>]*href\s*=\s*["\']?([^"\'\s>]+)/i', $clean, $m ) ? $m[1] : [];
+        if ( preg_match( '/\[(url|link)[=\]]/i', $clean ) || self::foreignLinks( implode( ' ', $hrefs ) ) ) {
             $this->add( 'markup_links', 4, 'BBCode or HTML links' );
         }
         if ( $outside >= 3 ) {
             $this->add( 'many_links', 3, $outside . ' links' );
         } elseif ( $outside > 0 ) {
             $this->add( 'links', 1, $outside . ' link' . ( $outside > 1 ? 's' : '' ) );
+        }
+        if ( preg_match( self::SHORT_LINKS, $clean ) ) {
+            $this->add( 'short_link', 2, 'shortened or messaging redirect link' );
         }
 
         $name = $this->s->name;
@@ -250,10 +310,9 @@ final class Checker {
             $this->add( 'injection', 6, 'script injection attempt' );
         }
 
-        $lower = strtolower( $text );
-        $hits  = array_values( array_filter(
+        $hits = array_values( array_filter(
             (array) apply_filters( 'breakwater_phrases', self::PHRASES ),
-            fn ( $phrase ): bool => is_string( $phrase ) && str_contains( $lower, $phrase )
+            fn ( $phrase ): bool => is_string( $phrase ) && '' !== $phrase && (bool) preg_match( '/(?<![\p{L}\p{N}])' . preg_quote( $phrase, '/' ) . '(?![\p{L}\p{N}])/iu', $clean )
         ) );
         if ( $hits ) {
             $this->add( 'phrases', min( 3, count( $hits ) ), implode( ', ', array_slice( $hits, 0, 5 ) ) );
@@ -418,7 +477,12 @@ final class Checker {
         if ( null === $list ) {
             $list = array_flip( Assets::disposableDomains() );
         }
-        return isset( $list[ $domain ] );
+        if ( isset( $list[ $domain ] ) ) {
+            return true;
+        }
+        // Catch subdomains of throwaway mail services (e.g. sub.mailinator.com).
+        $parts = explode( '.', $domain );
+        return count( $parts ) > 2 && isset( $list[ implode( '.', array_slice( $parts, -2 ) ) ] );
     }
 
     public static function domainReceivesMail( string $domain ): bool {
