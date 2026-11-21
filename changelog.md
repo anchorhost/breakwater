@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 (2026-11-21)
 
 * **Browser-consistency checks are now scored, and browser-proof bypasses closed.** Across 157 sites running Breakwater, missing fetch metadata, missing `Accept-Language`, `HeadlessChrome` client hints, contradicting client hints, a user-agent mismatch between the script and the server, and desktop forms filled without any keystrokes had a 0% false-positive rate on clean submissions while appearing heavily in spam and missed spam. They are now scored (`HeadlessChrome` 6 as automation-only, contradicting client hints 4, missing fetch metadata / languages / client hints / user-agent mismatch 3, desktop fill without keys 2), while `stale_browser` and client-hints version drift stay at 0 (1–2 version drift from browser updates is ignored). A bot posting a stub `bw_meta` without finishing proof of work or sending `elapsed = 0` no longer downgrades `no_js` or skips `too_fast`.
 * **Stricter content and disposable-domain checks.** Spam phrases now match on word boundaries (allowing ordinary plurals while stopping "popcorn" matching "porn"), invisible zero-width characters are stripped before scoring, mixed-script homoglyph obfuscation inside a word scores 4, shortened and messaging redirect links (`bit.ly`, `tinyurl.com`, `t.me`, `wa.me`, …) score 2 even without `https://`, and subdomains of throwaway mail services match the disposable list.
