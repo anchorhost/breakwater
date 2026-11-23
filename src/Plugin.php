@@ -11,7 +11,7 @@ use Breakwater\Adapters\Registry;
  */
 final class Plugin {
 
-    public const VERSION = '0.6.2';
+    public const VERSION = '0.6.3';
     public const OPTION  = 'breakwater';
 
     private static string $file = '';

@@ -3,7 +3,7 @@
  * Plugin Name:       Breakwater
  * Plugin URI:        https://github.com/anchorhost/breakwater
  * Description:       Spam protection for comments, registrations and contact forms. Works on its own: no API keys, no accounts, no setup.
- * Version:           0.6.2
+ * Version:           0.6.3
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            Anchor Hosting
