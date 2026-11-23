@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.2 (2026-11-23)
+
+* **Hosted third-party forms (HubSpot, Mailchimp embeds, ConvertKit, etc.) are no longer touched.** The page script previously attached to every `<form method="post">` on the page regardless of its `action`, injecting `bw_url`, `bw_meta` and `bw_token` into cross-origin embedded forms such as HubSpot (`forms.hsforms.com`) and holding their `submit` event, which could break their submissions. Forms whose `action` points to another hostname, along with HubSpot `.hs-form` / `.hs-form-private` forms, are now skipped completely.
+
 ## 0.6.1 (2026-11-23)
 
 * **Perfmatters and FlyingPress Delay JS no longer break the page script.** Perfmatters delayed `breakwater-js-before` (`window.breakwater`) while running `breakwater-js-after` immediately, causing Breakwater to see no endpoint and abort so real visitors scored `no_js` (6). The must-use build now emits the config and script in a single inline `<script>` tag so no optimizer can split them, and Breakwater now registers `perfmatters_delay_js_exclusions`, `perfmatters_defer_js_exclusions`, `flying_press_exclude_from_delay` and `flying_press_exclude_from_defer`.
