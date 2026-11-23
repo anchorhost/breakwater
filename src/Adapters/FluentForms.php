@@ -24,6 +24,7 @@ final class FluentForms extends Adapter {
     public function source(): string { return 'fluentform'; }
     public function label(): string { return 'Fluent Forms'; }
     public function detected(): bool { return defined( 'FLUENTFORM_VERSION' ); }
+    public function formSelectors(): array { return [ '.frm-fluent-form' ]; }
     public function keepsSpam(): bool { return true; }
 
     public function register(): void {

@@ -28,6 +28,17 @@ abstract class Adapter {
     abstract public function register(): void;
 
     /**
+     * CSS selectors matching the <form> elements this adapter checks on the page. Breakwater's
+     * script only attaches to these forms, leaving checkout, donation, login and third-party
+     * hosted embeds untouched.
+     *
+     * @return list<string>
+     */
+    public function formSelectors(): array {
+        return [];
+    }
+
+    /**
      * Whether stopped spam lands somewhere the site owner can restore it (a spam folder).
      * When false, the log offers "Email to admin" instead.
      */

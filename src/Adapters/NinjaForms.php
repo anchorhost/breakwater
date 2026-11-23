@@ -24,6 +24,7 @@ final class NinjaForms extends Adapter {
     public function source(): string { return 'ninja-forms'; }
     public function label(): string { return 'Ninja Forms'; }
     public function detected(): bool { return class_exists( 'Ninja_Forms' ); }
+    public function formSelectors(): array { return [ '.nf-form-cont form' ]; }
 
     public function register(): void {
         add_filter( 'ninja_forms_submit_data', $this->check( ... ), 99 );

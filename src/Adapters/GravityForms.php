@@ -28,6 +28,7 @@ final class GravityForms extends Adapter {
     public function source(): string { return 'gravityforms'; }
     public function label(): string { return 'Gravity Forms'; }
     public function detected(): bool { return class_exists( 'GFForms' ); }
+    public function formSelectors(): array { return [ 'form[id^="gform_"]' ]; }
     public function keepsSpam(): bool { return true; }
 
     public function register(): void {

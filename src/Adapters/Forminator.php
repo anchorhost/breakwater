@@ -26,6 +26,7 @@ final class Forminator extends Adapter {
     public function source(): string { return 'forminator'; }
     public function label(): string { return 'Forminator'; }
     public function detected(): bool { return defined( 'FORMINATOR_VERSION' ); }
+    public function formSelectors(): array { return [ '.forminator-custom-form' ]; }
     public function keepsSpam(): bool { return self::canRelease(); }
 
     public function register(): void {

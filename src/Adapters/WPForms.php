@@ -27,6 +27,7 @@ final class WPForms extends Adapter {
     public function source(): string { return 'wpforms'; }
     public function label(): string { return 'WPForms'; }
     public function detected(): bool { return function_exists( 'wpforms' ); }
+    public function formSelectors(): array { return [ '.wpforms-form' ]; }
     public function keepsSpam(): bool { return function_exists( 'wpforms' ) && wpforms()->is_pro(); }
 
     public function register(): void {

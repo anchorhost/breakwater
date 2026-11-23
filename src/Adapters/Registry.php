@@ -65,4 +65,19 @@ final class Registry {
     public static function detected(): array {
         return array_filter( self::all(), fn ( Adapter $adapter ): bool => $adapter->detected() );
     }
+
+    /**
+     * Form selectors for every detected adapter on this site. Custom integrations can add
+     * their own through breakwater_form_selectors.
+     *
+     * @return list<string>
+     */
+    public static function formSelectors(): array {
+        $selectors = [];
+        foreach ( self::detected() as $adapter ) {
+            $selectors = array_merge( $selectors, $adapter->formSelectors() );
+        }
+        $selectors = apply_filters( 'breakwater_form_selectors', array_values( array_unique( $selectors ) ) );
+        return is_array( $selectors ) ? array_values( array_filter( $selectors, fn ( mixed $s ): bool => is_string( $s ) && '' !== trim( $s ) ) ) : [];
+    }
 }

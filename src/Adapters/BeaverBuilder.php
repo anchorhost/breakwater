@@ -31,6 +31,7 @@ final class BeaverBuilder extends Adapter {
     public function source(): string { return 'beaver-builder'; }
     public function label(): string { return 'Beaver Builder'; }
     public function detected(): bool { return defined( 'FL_BUILDER_VERSION' ); }
+    public function formSelectors(): array { return [ '.fl-contact-form', '.fl-subscribe-form' ]; }
 
     public function register(): void {
         // Early, so other before-send listeners (CRMs, logs) never see spam.

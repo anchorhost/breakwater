@@ -23,6 +23,7 @@ final class Comments extends Adapter {
     public function source(): string { return 'comment'; }
     public function label(): string { return 'Comments'; }
     public function detected(): bool { return true; }
+    public function formSelectors(): array { return [ '#commentform', 'form.comment-form', 'form[action*="wp-comments-post.php"]' ]; }
     public function keepsSpam(): bool { return true; }
 
     public function register(): void {

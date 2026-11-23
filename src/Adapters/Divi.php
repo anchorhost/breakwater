@@ -32,6 +32,7 @@ final class Divi extends Adapter {
     public function source(): string { return 'divi'; }
     public function label(): string { return 'Divi contact form'; }
     public function detected(): bool { return defined( 'ET_BUILDER_VERSION' ) || defined( 'ET_CORE_VERSION' ); }
+    public function formSelectors(): array { return [ '.et_pb_contact_form' ]; }
 
     public function register(): void {
         add_filter( 'et_pb_module_shortcode_attributes', $this->divi4( ... ), 99, 3 );

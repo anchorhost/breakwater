@@ -34,6 +34,7 @@ final class Breakdance extends Adapter {
     public function source(): string { return 'breakdance'; }
     public function label(): string { return 'Breakdance'; }
     public function detected(): bool { return defined( 'BREAKDANCE_MODE' ) && 'breakdance' === BREAKDANCE_MODE; }
+    public function formSelectors(): array { return [ '.breakdance-form' ]; }
 
     public function register(): void {
         add_filter( 'breakdance_form_validate_field', $this->check( ... ), 99, 4 );

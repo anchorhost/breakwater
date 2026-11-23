@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Breakwater;
 
+use Breakwater\Adapters\Registry;
 use WP_REST_Response;
 
 /**
@@ -35,12 +36,20 @@ final class Front {
     }
 
     public static function enqueue(): void {
+        if ( Guard::trusted() ) {
+            return; // Editors and admins are never checked; leave front-end builders untouched.
+        }
         if ( 'login_enqueue_scripts' === current_action() && 'register' !== sanitize_key( (string) ( $_REQUEST['action'] ?? '' ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+            return;
+        }
+        $selectors = Registry::formSelectors();
+        if ( ! $selectors ) {
             return;
         }
         // Static per version, so cached pages stay valid: the challenge itself is fetched live.
         Assets::enqueueScript( [
             'endpoint' => rest_url( 'breakwater/v1/challenge' ),
+            'forms'    => implode( ', ', $selectors ),
         ] );
     }
 }

@@ -18,6 +18,7 @@ final class MailPoet extends Adapter {
     public function source(): string { return 'mailpoet'; }
     public function label(): string { return 'MailPoet'; }
     public function detected(): bool { return defined( 'MAILPOET_VERSION' ); }
+    public function formSelectors(): array { return [ '.mailpoet_form' ]; }
 
     public function register(): void {
         add_action( 'mailpoet_subscription_before_subscribe', $this->check( ... ), 99, 3 );

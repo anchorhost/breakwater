@@ -25,6 +25,7 @@ final class Avada extends Adapter {
     public function source(): string { return 'avada'; }
     public function label(): string { return 'Avada Forms'; }
     public function detected(): bool { return class_exists( 'Fusion_Form_Submit' ); }
+    public function formSelectors(): array { return [ '.fusion-form' ]; }
 
     public function register(): void {
         add_filter( 'fusion_builder_form_submission_data', $this->check( ... ), 5 );

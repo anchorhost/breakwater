@@ -19,6 +19,7 @@ final class WooCommerce extends Adapter {
     public function source(): string { return 'woocommerce'; }
     public function label(): string { return 'WooCommerce registration'; }
     public function detected(): bool { return class_exists( 'WooCommerce' ); }
+    public function formSelectors(): array { return [ 'form.woocommerce-form-register' ]; }
 
     public function register(): void {
         add_filter( 'woocommerce_registration_errors', $this->check( ... ), 99, 3 );

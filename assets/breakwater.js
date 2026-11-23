@@ -1,5 +1,5 @@
 /**
- * Breakwater: adds browser proof to every POST form on the page.
+ * Breakwater: adds browser proof to forms Breakwater checks on the server.
  *
  * - bw_url   honeypot, hidden from people and assistive tech
  * - bw_meta  time on page, clicks/taps and keys, webdriver flag, how many characters of the
@@ -11,7 +11,9 @@
  * own payload (a JSON model, one serialized field) instead of the form's inputs. A cookie
  * rides along with any same-site request however the payload is built.
  *
- * The work starts when someone touches a field, so most visitors never pay for it.
+ * Only forms matching the detected adapters' selectors are touched, and work and cookies
+ * only start once someone interacts with one, so checkout, donation, login, search and
+ * third-party hosted forms are left alone.
  *
  * Time and counts carry over a form submit that loads a new page in the same tab (a multi-page
  * form's Next, a validation error), so the last step of a long form is not judged on its own.
@@ -20,7 +22,8 @@
 	'use strict';
 
 	var config = window.breakwater || {};
-	if ( ! config.endpoint || ! window.fetch ) {
+	var selector = typeof config.forms === 'string' ? config.forms.trim() : '';
+	if ( ! config.endpoint || ! selector || ! window.fetch ) {
 		return;
 	}
 
@@ -33,6 +36,7 @@
 	carried();
 	var token = '';
 	var solving = null;
+	var engaged = false;
 
 	var secure = location.protocol === 'https:' ? '; Secure' : '';
 
@@ -41,14 +45,25 @@
 	}
 
 	function remember() {
-		cookie( 'bw_meta', meta(), 43200 );
+		if ( engaged ) {
+			cookie( 'bw_meta', meta(), 43200 );
+		}
+	}
+
+	function engage() {
+		engaged = true;
+		remember();
 	}
 
 	document.addEventListener( 'pointerdown', function ( event ) {
 		touches++;
+		var form = event.target && event.target.closest ? event.target.closest( 'form' ) : null;
+		if ( recognized( form ) ) {
+			engaged = true;
+		}
 		remember();
 		// Gravity Forms turns pages with form.submit(), which fires no submit event.
-		if ( event.target && event.target.closest && event.target.closest( 'form button, form [type="submit"], form [type="button"]' ) ) {
+		if ( protectable( form ) && event.target.closest( 'button, [type="submit"], [type="button"]' ) ) {
 			carry();
 		}
 		// A click on something that sends a form: fetch a fresh proof for the next send,
@@ -57,10 +72,17 @@
 			setTimeout( refresh, 3000 );
 		}
 	}, { capture: true, passive: true } );
-	document.addEventListener( 'touchstart', function () { touches++; remember(); }, { capture: true, passive: true } );
+	document.addEventListener( 'touchstart', function ( event ) {
+		touches++;
+		var form = event.target && event.target.closest ? event.target.closest( 'form' ) : null;
+		if ( recognized( form ) ) {
+			engaged = true;
+		}
+		remember();
+	}, { capture: true, passive: true } );
 	document.addEventListener( 'keydown', function ( event ) {
 		keys++;
-		if ( event.key === 'Enter' && event.target && event.target.closest && event.target.closest( 'form' ) ) {
+		if ( event.key === 'Enter' && event.target && event.target.closest && protectable( event.target.closest( 'form' ) ) ) {
 			carry();
 		}
 	}, true );
@@ -68,6 +90,9 @@
 		var type = event.inputType || '';
 		if ( isMessage( event.target ) && type.indexOf( 'insert' ) === 0 && type !== 'insertFromPaste' && type !== 'insertFromDrop' ) {
 			typed += ( event.data || '' ).length || 1;
+		}
+		if ( event.target && event.target.matches && event.target.matches( 'input, textarea, select' ) && wanted( event.target ) ) {
+			engaged = true;
 		}
 		remember();
 	}, true );
@@ -82,6 +107,7 @@
 	}
 	document.addEventListener( 'focusin', function ( event ) {
 		if ( event.target && event.target.matches && event.target.matches( 'input, textarea, select' ) && wanted( event.target ) ) {
+			engage();
 			solve();
 		}
 	}, true );
@@ -102,21 +128,26 @@
 		}
 	}
 
-	// Each proof is a request to the site, so none for what Breakwater never checks: search boxes,
-	// forms that send by GET, hosted third-party forms, and WooCommerce's cart and sort forms.
-	// Forms with no method at all still count: Ninja Forms, Beaver Builder and Breakdance send theirs by script.
-	function wanted( input ) {
-		if ( input.type === 'search' || input.type === 'hidden' || input.name === 's' || input.closest( '[role="search"], .search-form, .searchform' ) ) {
+	// Only forms Breakwater actually checks on the server (the detected adapters' selectors).
+	function recognized( form ) {
+		if ( ! form || form.tagName !== 'FORM' || external( form ) ) {
 			return false;
 		}
-		var form = input.closest( 'form' );
-		if ( ! form ) {
-			return true;
+		try {
+			return form.matches( selector );
+		} catch ( e ) {
+			return false;
 		}
-		return ( form.getAttribute( 'method' ) || '' ).toLowerCase() !== 'get'
-			&& ! external( form )
-			&& ! form.querySelector( 'input[name="s"], input[type="search"]' )
-			&& ! form.matches( 'form.cart, .woocommerce-cart-form, .woocommerce-ordering, .hs-form, .hs-form-private' );
+	}
+
+	// Each proof is a request to the site, so only ask for one when a visitor starts on a form
+	// Breakwater checks. Forms with no method at all still count: Ninja Forms, Beaver Builder,
+	// Breakdance, Avada and Elementor atomic forms send theirs by script and carry proof by cookie.
+	function wanted( input ) {
+		if ( input.type === 'search' || input.type === 'hidden' || input.name === 's' ) {
+			return false;
+		}
+		return recognized( input.closest( 'form' ) );
 	}
 
 	// Picks up where the page before left off, if it was a form sent less than 30 minutes ago.
@@ -239,6 +270,7 @@
 						signature: task.signature,
 						number: number
 					} ) );
+					engaged = true;
 					cookie( 'bw_token', token, 43200 );
 					remember();
 					fill();
@@ -265,10 +297,10 @@
 	}
 
 	function protectable( form ) {
-		var method = ( form.getAttribute( 'method' ) || 'get' ).toLowerCase();
-		if ( external( form ) || form.matches( 'form.cart, .woocommerce-cart-form, .woocommerce-ordering, [role="search"], .hs-form, .hs-form-private' ) ) {
-			return false; // Hosted third-party forms, adding to the cart, sorting and searching are never checked.
+		if ( ! recognized( form ) ) {
+			return false;
 		}
+		var method = ( form.getAttribute( 'method' ) || 'get' ).toLowerCase();
 		return method === 'post' || form.matches( '.elementor-form, .wpcf7-form, .wpforms-form, form[id^="gform_"]' );
 	}
 
@@ -333,7 +365,7 @@
 			return;
 		}
 		field( form, 'bw_meta', meta() );
-		remember();
+		engage();
 		carry();
 		if ( pageTurn( form ) ) {
 			solve();

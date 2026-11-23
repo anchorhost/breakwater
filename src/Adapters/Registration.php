@@ -18,6 +18,7 @@ final class Registration extends Adapter {
     public function source(): string { return 'registration'; }
     public function label(): string { return 'WordPress registration'; }
     public function detected(): bool { return (bool) get_option( 'users_can_register' ) || is_multisite(); }
+    public function formSelectors(): array { return [ '#registerform', '#setupform', 'form[action*="wp-signup.php"]' ]; }
 
     public function register(): void {
         add_filter( 'registration_errors', $this->check( ... ), 99, 3 );

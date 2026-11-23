@@ -21,6 +21,7 @@ final class Kadence extends Adapter {
     public function source(): string { return 'kadence'; }
     public function label(): string { return 'Kadence Blocks forms'; }
     public function detected(): bool { return defined( 'KADENCE_BLOCKS_VERSION' ); }
+    public function formSelectors(): array { return [ '.kb-form', '.kb-advanced-form' ]; }
 
     public function register(): void {
         add_filter( 'kadence_blocks_advanced_form_submission_reject', $this->checkAdvanced( ... ), 99, 4 );

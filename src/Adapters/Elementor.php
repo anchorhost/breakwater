@@ -24,6 +24,7 @@ final class Elementor extends Adapter {
     public function source(): string { return 'elementor'; }
     public function label(): string { return 'Elementor Pro forms'; }
     public function detected(): bool { return defined( 'ELEMENTOR_PRO_VERSION' ); }
+    public function formSelectors(): array { return [ '.elementor-form', 'form[data-element_type="e-form"]', 'form[data-e-type="e-form"]' ]; }
 
     public function register(): void {
         add_action( 'elementor_pro/forms/validation', $this->check( ... ), 99, 2 );

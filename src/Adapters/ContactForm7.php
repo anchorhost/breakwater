@@ -26,6 +26,7 @@ final class ContactForm7 extends Adapter {
     public function source(): string { return 'contact-form-7'; }
     public function label(): string { return 'Contact Form 7'; }
     public function detected(): bool { return defined( 'WPCF7_VERSION' ); }
+    public function formSelectors(): array { return [ '.wpcf7-form' ]; }
     public function keepsSpam(): bool { return class_exists( 'Flamingo_Inbound_Message' ); }
 
     public function register(): void {

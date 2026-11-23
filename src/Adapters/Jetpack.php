@@ -42,6 +42,7 @@ final class Jetpack extends Adapter {
     public function source(): string { return 'jetpack'; }
     public function label(): string { return 'Jetpack Forms'; }
     public function detected(): bool { return class_exists( self::FORM ) || class_exists( 'Grunion_Contact_Form' ); }
+    public function formSelectors(): array { return [ '.jetpack-contact-form__form', 'form.contact-form.commentsblock' ]; }
     public function keepsSpam(): bool { return true; }
 
     public function register(): void {

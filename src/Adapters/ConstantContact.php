@@ -23,6 +23,7 @@ final class ConstantContact extends Adapter {
     public function source(): string { return 'constant-contact'; }
     public function label(): string { return 'Constant Contact Forms'; }
     public function detected(): bool { return class_exists( 'Constant_Contact' ); }
+    public function formSelectors(): array { return [ '.ctct-form' ]; }
 
     public function register(): void {
         add_filter( 'constant_contact_maybe_spam', $this->check( ... ), 20, 2 );

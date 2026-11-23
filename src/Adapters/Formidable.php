@@ -27,6 +27,7 @@ final class Formidable extends Adapter {
     public function source(): string { return 'formidable'; }
     public function label(): string { return 'Formidable Forms'; }
     public function detected(): bool { return class_exists( 'FrmAppHelper' ); }
+    public function formSelectors(): array { return [ '.frm-show-form' ]; }
 
     public function keepsSpam(): bool {
         return method_exists( 'FrmSpamEntriesHelper', 'maybe_flag_submission' ) && \FrmSpamEntriesHelper::should_save( 'breakwater' );

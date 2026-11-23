@@ -21,6 +21,7 @@ final class Mailchimp extends Adapter {
     public function source(): string { return 'mc4wp'; }
     public function label(): string { return 'Mailchimp for WP'; }
     public function detected(): bool { return defined( 'MC4WP_VERSION' ); }
+    public function formSelectors(): array { return [ '.mc4wp-form' ]; }
 
     public function register(): void {
         add_filter( 'mc4wp_form_errors', $this->check( ... ), 99, 2 );

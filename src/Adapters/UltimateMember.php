@@ -19,6 +19,7 @@ final class UltimateMember extends Adapter {
     public function source(): string { return 'ultimate-member'; }
     public function label(): string { return 'Ultimate Member registration'; }
     public function detected(): bool { return function_exists( 'UM' ); }
+    public function formSelectors(): array { return [ '.um-register form' ]; }
 
     public function register(): void {
         add_action( 'um_submit_form_register', $this->check( ... ), 5, 2 );
