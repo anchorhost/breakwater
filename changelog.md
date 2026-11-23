@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1 (2026-11-23)
+
+* **Perfmatters and FlyingPress Delay JS no longer break the page script.** Perfmatters delayed `breakwater-js-before` (`window.breakwater`) while running `breakwater-js-after` immediately, causing Breakwater to see no endpoint and abort so real visitors scored `no_js` (6). The must-use build now emits the config and script in a single inline `<script>` tag so no optimizer can split them, and Breakwater now registers `perfmatters_delay_js_exclusions`, `perfmatters_defer_js_exclusions`, `flying_press_exclude_from_delay` and `flying_press_exclude_from_defer`.
+* **Automated browsers (`navigator.webdriver`), client-hints version spoofing and stale Chrome versions are now scored accurately.** Across 3,717 weekend CleanTalk comparisons on 4,043 sites, `webdriver` (already automation-only) was scoring 4 instead of 6 and letting 126 automated browsers pass, while client-hints version drift (>2 versions) fired on 147 missed spam submissions vs 1 clean submission (0.1%). `webdriver` now scores 6, client-hints version spoofing (>2 versions) scores 4, and `stale_browser` scores 1 — raising CleanTalk spam recall from 83.6% to 89.2% with 0 added false positives.
+
 ## 0.6.0 (2026-11-21)
 
 * **Browser-consistency checks are now scored, and browser-proof bypasses closed.** Across 157 sites running Breakwater, missing fetch metadata, missing `Accept-Language`, `HeadlessChrome` client hints, contradicting client hints, a user-agent mismatch between the script and the server, and desktop forms filled without any keystrokes had a 0% false-positive rate on clean submissions while appearing heavily in spam and missed spam. They are now scored (`HeadlessChrome` 6 as automation-only, contradicting client hints 4, missing fetch metadata / languages / client hints / user-agent mismatch 3, desktop fill without keys 2), while `stale_browser` and client-hints version drift stay at 0 (1–2 version drift from browser updates is ignored). A bot posting a stub `bw_meta` without finishing proof of work or sending `elapsed = 0` no longer downgrades `no_js` or skips `too_fast`.
