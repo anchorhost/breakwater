@@ -86,9 +86,25 @@
 		}
 	}, true );
 
+	// Hosted forms (HubSpot, Mailchimp, ConvertKit, ActiveCampaign, Salesforce, ...) post straight
+	// to another host: Breakwater never sees them on the server, and injecting fields or holding
+	// their submit event breaks their own handlers and APIs.
+	function external( form ) {
+		var action = ( form.getAttribute( 'action' ) || '' ).trim();
+		if ( ! action || action.charAt( 0 ) === '#' ) {
+			return false;
+		}
+		try {
+			var parsed = new URL( action, location.href );
+			return ( parsed.protocol === 'http:' || parsed.protocol === 'https:' ) && parsed.hostname !== location.hostname;
+		} catch ( e ) {
+			return false;
+		}
+	}
+
 	// Each proof is a request to the site, so none for what Breakwater never checks: search boxes,
-	// forms that send by GET, and WooCommerce's cart and sort forms. Forms with no method at all
-	// still count: Ninja Forms, Beaver Builder and Breakdance send theirs by script.
+	// forms that send by GET, hosted third-party forms, and WooCommerce's cart and sort forms.
+	// Forms with no method at all still count: Ninja Forms, Beaver Builder and Breakdance send theirs by script.
 	function wanted( input ) {
 		if ( input.type === 'search' || input.type === 'hidden' || input.name === 's' || input.closest( '[role="search"], .search-form, .searchform' ) ) {
 			return false;
@@ -98,8 +114,9 @@
 			return true;
 		}
 		return ( form.getAttribute( 'method' ) || '' ).toLowerCase() !== 'get'
+			&& ! external( form )
 			&& ! form.querySelector( 'input[name="s"], input[type="search"]' )
-			&& ! form.matches( 'form.cart, .woocommerce-cart-form, .woocommerce-ordering' );
+			&& ! form.matches( 'form.cart, .woocommerce-cart-form, .woocommerce-ordering, .hs-form, .hs-form-private' );
 	}
 
 	// Picks up where the page before left off, if it was a form sent less than 30 minutes ago.
@@ -249,8 +266,8 @@
 
 	function protectable( form ) {
 		var method = ( form.getAttribute( 'method' ) || 'get' ).toLowerCase();
-		if ( form.matches( 'form.cart, .woocommerce-cart-form, .woocommerce-ordering, [role="search"]' ) ) {
-			return false; // Adding to the cart, sorting and searching are never checked.
+		if ( external( form ) || form.matches( 'form.cart, .woocommerce-cart-form, .woocommerce-ordering, [role="search"], .hs-form, .hs-form-private' ) ) {
+			return false; // Hosted third-party forms, adding to the cart, sorting and searching are never checked.
 		}
 		return method === 'post' || form.matches( '.elementor-form, .wpcf7-form, .wpforms-form, form[id^="gform_"]' );
 	}
