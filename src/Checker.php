@@ -106,7 +106,7 @@ final class Checker {
             $this->add( 'no_interaction', 2, 'no clicks, taps or keys' );
         }
         if ( ! empty( $meta['w'] ) ) {
-            $this->add( 'webdriver', 4, 'automated browser' );
+            $this->add( 'webdriver', 6, 'automated browser' );
         }
         // Desktop browser automation (Playwright fill(), DevTools insertText) puts text straight
         // into a textarea without firing keydown. Mobile is skipped (iOS voice dictation does this).
@@ -131,16 +131,11 @@ final class Checker {
         if ( (int) $meta['v'] >= 3 && '' !== $agent && strlen( $agent ) < 300 && ! is_string( $meta['u'] ?? null ) ) {
             return false;
         }
-        // 0-point client-hints version drift happens on real browsers and should not escalate to no_js.
-        if ( isset( $inconsistencies['client_hints'] ) && str_starts_with( $inconsistencies['client_hints'], 'client hints say Chrome ' ) ) {
-            unset( $inconsistencies['client_hints'] );
-        }
         return ! array_intersect_key( $inconsistencies, array_flip( [ 'no_fetch_metadata', 'no_language', 'client_hints', 'headless_browser', 'agent_mismatch' ] ) );
     }
 
     /**
-     * Does the browser match what its user agent claims? Signals verified at 0% false positives
-     * in fleet telemetry are scored; stale_browser and client-hints version drift stay at 0.
+     * Does the browser match what its user agent claims? Scored from fleet CleanTalk telemetry.
      *
      * @param array<string, string> $inconsistencies
      */
@@ -151,8 +146,8 @@ final class Checker {
                 'no_fetch_metadata' => 3,
                 'no_language'       => 3,
                 'agent_mismatch'    => 3,
-                'client_hints'      => str_starts_with( $detail, 'client hints say Chrome ' ) ? 0
-                    : ( str_starts_with( $detail, 'no client hints' ) ? 3 : 4 ),
+                'client_hints'      => str_starts_with( $detail, 'no client hints' ) ? 3 : 4,
+                'stale_browser'     => 1,
                 default             => 0,
             };
             $this->add( $code, $points, $detail );

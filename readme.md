@@ -14,9 +14,10 @@ Each submission is scored. At 5 points it is spam (`breakwater_threshold`).
 | No browser proof | 6 | The script never ran: a bot posting straight to the form |
 | Proof of work forged or wrong | 8 | |
 | Proof of work reused / not finished / expired | 3 / 2 / 1 | |
-| Automated browser (`navigator.webdriver` / `HeadlessChrome` client hints) | 4 / 6 | |
-| Client hints contradict the user agent / missing on Chrome 90+ | 4 / 3 | Version drift stays logged at 0 |
+| Automated browser (`navigator.webdriver` / `HeadlessChrome` client hints) | 6 | |
+| Client hints contradict the user agent / missing on Chrome 90+ | 4 / 3 | Version drift within 2 versions is ignored |
 | Missing fetch metadata / missing `Accept-Language` / script saw another user agent | 3 | On HTTPS with a current browser user agent |
+| Chrome 12+ versions out of date | 1 | |
 | Bot user agent (curl, python, HeadlessChrome, ...) | 4 | |
 | Sent under 2.5s after page load / no clicks or keys / desktop filled without typing | 3 / 2 / 2 | |
 | BBCode or HTML links | 4 | |
@@ -40,14 +41,7 @@ The proof of work is stateless and cache-safe: the page carries only the endpoin
 
 The proof travels in hidden fields added to the form and, as a fallback, in two first-party cookies (`bw_token`, `bw_meta`; SameSite=Lax, 12 hours). The cookies matter for form plugins that post their own payload instead of the form's inputs (Ninja Forms, Constant Contact, MailPoet).
 
-**Logged, not scored yet.** Some checks are recorded on the log row at 0 points because real browsers occasionally trip them. They don't change the score or appear as reasons, but `wp breakwater log` lists them:
-
-| Signal | What it notices |
-|---|---|
-| `stale_browser` | Chrome 12 or more versions old. Over half of fleet form spam claims one, but a few percent of real visitors still run old Chrome |
-| `client_hints` (version drift) | Chromium's `Sec-CH-UA` major version differs from `Chrome/N` in the user agent by more than 2 versions |
-
-The headers behind them are kept with the row's payload.
+The headers behind the browser-consistency checks are kept with the row's payload.
 
 Logged-in users who can edit posts or moderate comments are never checked (`breakwater_skip`).
 

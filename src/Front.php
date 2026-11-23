@@ -38,10 +38,9 @@ final class Front {
         if ( 'login_enqueue_scripts' === current_action() && 'register' !== sanitize_key( (string) ( $_REQUEST['action'] ?? '' ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification
             return;
         }
-        Assets::enqueueScript();
         // Static per version, so cached pages stay valid: the challenge itself is fetched live.
-        wp_add_inline_script( 'breakwater', 'window.breakwater=' . wp_json_encode( [
+        Assets::enqueueScript( [
             'endpoint' => rest_url( 'breakwater/v1/challenge' ),
-        ] ) . ';', 'before' );
+        ] );
     }
 }

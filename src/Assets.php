@@ -15,24 +15,34 @@ final class Assets {
         return class_exists( Bundle::class, false );
     }
 
-    public static function enqueueScript(): void {
+    /** @param array<string, mixed> $config */
+    public static function enqueueScript( array $config = [] ): void {
+        $inline = 'window.breakwater=' . wp_json_encode( $config ) . ';';
         if ( self::bundled() ) {
+            // One inline tag for config + script, so a JS-delay plugin can never delay one without the other.
             wp_register_script( 'breakwater', false, [], Plugin::VERSION, [ 'in_footer' => true ] );
             wp_enqueue_script( 'breakwater' );
-            wp_add_inline_script( 'breakwater', Bundle::SCRIPT );
+            wp_add_inline_script( 'breakwater', $inline . "\n" . Bundle::SCRIPT );
             return;
         }
         wp_enqueue_script( 'breakwater', plugins_url( 'assets/breakwater.js', Plugin::file() ), [], Plugin::VERSION, [ 'in_footer' => true, 'strategy' => 'defer' ] );
+        wp_add_inline_script( 'breakwater', $inline, 'before' );
     }
 
     /**
-     * Keep script optimizers (WP Rocket, LiteSpeed, Cloudflare Rocket Loader, Perfmatters) from
-     * delaying Breakwater: delaying it resets the page timer on first click and can drop proof.
+     * Keep script optimizers (WP Rocket, LiteSpeed, Perfmatters, FlyingPress, Cloudflare Rocket
+     * Loader) from delaying Breakwater: delaying it resets the page timer on first click and can
+     * drop proof.
      */
     public static function registerExclusions(): void {
         add_filter( 'wp_script_attributes', [ self::class, 'scriptAttributes' ] );
         add_filter( 'wp_inline_script_attributes', [ self::class, 'scriptAttributes' ] );
-        foreach ( [ 'rocket_delay_js_exclusions', 'rocket_exclude_js', 'rocket_exclude_defer_js', 'litespeed_optimize_js_excludes' ] as $hook ) {
+        foreach ( [
+            'rocket_delay_js_exclusions', 'rocket_exclude_js', 'rocket_exclude_defer_js',
+            'litespeed_optimize_js_excludes',
+            'perfmatters_delay_js_exclusions', 'perfmatters_defer_js_exclusions',
+            'flying_press_exclude_from_delay', 'flying_press_exclude_from_defer',
+        ] as $hook ) {
             add_filter( $hook, [ self::class, 'exclude' ] );
         }
     }
