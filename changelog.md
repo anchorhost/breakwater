@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.3 (2026-11-23)
+
+* **Page script now uses an allowlist of detected adapters instead of touching every POST form.** Each adapter declares the form selectors it checks on the server (`Adapter::formSelectors()`, extensible via `breakwater_form_selectors`), and `breakwater.js` only attaches to forms matching detected adapters on the site. Non-adapter forms — WooCommerce checkout/login/coupon/account, GiveWP, EDD, hosted JS embeds without an external `action` (Klaviyo, OptinMonster, ConvertKit, HubSpot), login/2FA and custom React/SPA forms — are never mutated and their `submit` events are never intercepted.
+* **Logged-in editors and front-end builders no longer load the page script.** `Front::enqueue()` now returns early when `Guard::trusted()` is true, keeping front-end page builders and logged-in editors completely untouched while remaining page-cache safe.
+* **No cookies or `sessionStorage` until a visitor interacts with a protected form.** `bw_meta` is no longer written on clicks or scrolls on form-less pages or non-adapter forms, and `bw_carry` only runs for protected forms.
+
 ## 0.6.2 (2026-11-23)
 
 * **Hosted third-party forms (HubSpot, Mailchimp embeds, ConvertKit, etc.) are no longer touched.** The page script previously attached to every `<form method="post">` on the page regardless of its `action`, injecting `bw_url`, `bw_meta` and `bw_token` into cross-origin embedded forms such as HubSpot (`forms.hsforms.com`) and holding their `submit` event, which could break their submissions. Forms whose `action` points to another hostname, along with HubSpot `.hs-form` / `.hs-form-private` forms, are now skipped completely.
