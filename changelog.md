@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+* **Forms submitted via `form.submit()` or dropdowns no longer send stale timing and interaction counts.** Gravity Forms 2.9+ buttons submit with `form.submit()` (bypassing the DOM `submit` event), and dropdown/radio/autofill forms that fired no `input` event posted the `bw_meta` value written at page load (`e < 100ms, i = 0, k = 0`), causing real visitors to score `too_fast` + `no_interaction`. The page script now keeps hidden `bw_meta` inputs updated on pointer, touch, click, keyboard and `change` events.
+* **Consent auto-blockers, REST API restrictions and OptimizePress blank templates no longer block Breakwater.** The page script tag now carries `data-cmp-ab="1"`, `data-cookieconsent="ignore"` and `data-ot-ignore` so consent auto-blockers (iubenda/consentmanager, Cookiebot, OneTrust) do not disable it as an unknown tracking script. Breakwater also exempts its stateless `GET /breakwater/v1/challenge` endpoint from Perfmatters' "Disable REST API" and other `rest_authentication_errors` blockers, and allows its script on OptimizePress 3 blank templates.
+* **Beaver Builder v1 subscribe forms are recognised by the page script.** Older Beaver Builder subscribe modules render `<div role="form" class="fl-subscribe-form">` instead of a `<form>` element; the page script now engages and solves proof of work inside non-`<form>` adapter containers too.
+* **Gravity Forms entry-meta linking passes `$form_id` explicitly.** `GravityForms::link()` now passes the entry's `form_id` to `gform_update_meta()` instead of leaving Gravity Forms to look it up, preventing `Column 'form_id' cannot be null` database errors and saving a lookup per submission.
+
 ## 0.6.3 (2026-11-23)
 
 * **Page script now uses an allowlist of detected adapters instead of touching every POST form.** Each adapter declares the form selectors it checks on the server (`Adapter::formSelectors()`, extensible via `breakwater_form_selectors`), and `breakwater.js` only attaches to forms matching detected adapters on the site. Non-adapter forms — WooCommerce checkout/login/coupon/account, GiveWP, EDD, hosted JS embeds without an external `action` (Klaviyo, OptinMonster, ConvertKit, HubSpot), login/2FA and custom React/SPA forms — are never mutated and their `submit` events are never intercepted.

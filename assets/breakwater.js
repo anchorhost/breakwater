@@ -45,9 +45,16 @@
 	}
 
 	function remember() {
-		if ( engaged ) {
-			cookie( 'bw_meta', meta(), 43200 );
+		if ( ! engaged ) {
+			return;
 		}
+		var value = meta();
+		cookie( 'bw_meta', value, 43200 );
+		// Keep hidden inputs current too: form.submit() (Gravity Forms 2.9+ handleButtonClick)
+		// bypasses the submit event, so an input written only at load time would stay stale.
+		document.querySelectorAll( 'form[data-bw]' ).forEach( function ( form ) {
+			field( form, 'bw_meta', value );
+		} );
 	}
 
 	function engage() {
@@ -57,13 +64,16 @@
 
 	document.addEventListener( 'pointerdown', function ( event ) {
 		touches++;
-		var form = event.target && event.target.closest ? event.target.closest( 'form' ) : null;
-		if ( recognized( form ) ) {
+		var target = container( event.target );
+		if ( target ) {
 			engaged = true;
+			if ( target.tagName !== 'FORM' ) {
+				solve();
+			}
 		}
 		remember();
 		// Gravity Forms turns pages with form.submit(), which fires no submit event.
-		if ( protectable( form ) && event.target.closest( 'button, [type="submit"], [type="button"]' ) ) {
+		if ( target && protectable( target ) && event.target.closest( 'button, [type="submit"], [type="button"]' ) ) {
 			carry();
 		}
 		// A click on something that sends a form: fetch a fresh proof for the next send,
@@ -74,17 +84,32 @@
 	}, { capture: true, passive: true } );
 	document.addEventListener( 'touchstart', function ( event ) {
 		touches++;
-		var form = event.target && event.target.closest ? event.target.closest( 'form' ) : null;
-		if ( recognized( form ) ) {
+		var target = container( event.target );
+		if ( target ) {
 			engaged = true;
+			if ( target.tagName !== 'FORM' ) {
+				solve();
+			}
 		}
 		remember();
 	}, { capture: true, passive: true } );
+	document.addEventListener( 'click', function ( event ) {
+		var target = container( event.target );
+		if ( target ) {
+			engaged = true;
+			remember();
+		}
+	}, true );
 	document.addEventListener( 'keydown', function ( event ) {
 		keys++;
-		if ( event.key === 'Enter' && event.target && event.target.closest && protectable( event.target.closest( 'form' ) ) ) {
-			carry();
+		var target = container( event.target );
+		if ( target ) {
+			engaged = true;
+			if ( event.key === 'Enter' && protectable( target ) ) {
+				carry();
+			}
 		}
+		remember();
 	}, true );
 	document.addEventListener( 'input', function ( event ) {
 		var type = event.inputType || '';
@@ -93,6 +118,13 @@
 		}
 		if ( event.target && event.target.matches && event.target.matches( 'input, textarea, select' ) && wanted( event.target ) ) {
 			engaged = true;
+		}
+		remember();
+	}, true );
+	document.addEventListener( 'change', function ( event ) {
+		if ( event.target && event.target.matches && event.target.matches( 'input, textarea, select' ) && wanted( event.target ) ) {
+			engaged = true;
+			solve();
 		}
 		remember();
 	}, true );
@@ -140,6 +172,24 @@
 		}
 	}
 
+	// The enclosing protected form, or a non-<form> wrapper matched by an adapter selector
+	// (e.g. Beaver Builder v1 subscribe modules render <div role="form" class="fl-subscribe-form">).
+	function container( target ) {
+		if ( ! target || ! target.closest ) {
+			return null;
+		}
+		var form = target.closest( 'form' );
+		if ( form ) {
+			return recognized( form ) ? form : null;
+		}
+		try {
+			var wrapper = target.closest( selector );
+			return wrapper && wrapper.tagName !== 'FORM' ? wrapper : null;
+		} catch ( e ) {
+			return null;
+		}
+	}
+
 	// Each proof is a request to the site, so only ask for one when a visitor starts on a form
 	// Breakwater checks. Forms with no method at all still count: Ninja Forms, Beaver Builder,
 	// Breakdance, Avada and Elementor atomic forms send theirs by script and carry proof by cookie.
@@ -147,7 +197,7 @@
 		if ( input.type === 'search' || input.type === 'hidden' || input.name === 's' ) {
 			return false;
 		}
-		return recognized( input.closest( 'form' ) );
+		return !! container( input );
 	}
 
 	// Picks up where the page before left off, if it was a form sent less than 30 minutes ago.

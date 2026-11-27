@@ -34,7 +34,7 @@ final class GravityForms extends Adapter {
     public function register(): void {
         add_filter( 'gform_entry_is_spam', $this->check( ... ), 99, 3 );
         add_filter( 'gform_abort_submission_with_confirmation', $this->checkDraft( ... ), 99, 2 );
-        add_action( 'gform_entry_created', $this->link( ... ), 10, 1 );
+        add_action( 'gform_entry_created', $this->link( ... ), 10, 2 );
         add_action( 'gform_post_update_entry_property', $this->statusChanged( ... ), 10, 4 );
     }
 
@@ -84,11 +84,14 @@ final class GravityForms extends Adapter {
     }
 
     /** Remember which log row the saved entry came from (reset after linking so secondary entries don't overwrite it). */
-    private function link( mixed $entry ): void {
+    private function link( mixed $entry, mixed $form = null ): void {
         $log_id       = $this->log_id;
         $this->log_id = 0;
         if ( is_array( $entry ) && ! empty( $entry['id'] ) && $log_id && function_exists( 'gform_update_meta' ) ) {
-            gform_update_meta( (int) $entry['id'], 'breakwater_log_id', $log_id );
+            $form_id = (int) ( $entry['form_id'] ?? ( is_array( $form ) ? ( $form['id'] ?? 0 ) : 0 ) );
+            if ( $form_id > 0 ) {
+                gform_update_meta( (int) $entry['id'], 'breakwater_log_id', $log_id, $form_id );
+            }
             Log::link( $log_id, (string) (int) $entry['id'] );
         }
     }

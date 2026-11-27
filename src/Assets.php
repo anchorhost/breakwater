@@ -31,16 +31,17 @@ final class Assets {
 
     /**
      * Keep script optimizers (WP Rocket, LiteSpeed, Perfmatters, FlyingPress, Cloudflare Rocket
-     * Loader) from delaying Breakwater: delaying it resets the page timer on first click and can
-     * drop proof.
+     * Loader), consent auto-blockers (iubenda/consentmanager, Cookiebot, OneTrust) and blank
+     * page-builder templates (OptimizePress 3) from stripping, delaying or blocking Breakwater.
      */
     public static function registerExclusions(): void {
         add_filter( 'wp_script_attributes', [ self::class, 'scriptAttributes' ] );
         add_filter( 'wp_inline_script_attributes', [ self::class, 'scriptAttributes' ] );
+        add_filter( 'op3_script_is_allowed_in_blank_template', [ self::class, 'allowHandle' ], 10, 2 );
         foreach ( [
             'rocket_delay_js_exclusions', 'rocket_exclude_js', 'rocket_exclude_defer_js',
             'litespeed_optimize_js_excludes',
-            'perfmatters_delay_js_exclusions', 'perfmatters_defer_js_exclusions',
+            'perfmatters_delay_js_exclusions', 'perfmatters_defer_js_exclusions', 'perfmatters_rest_api_exceptions',
             'flying_press_exclude_from_delay', 'flying_press_exclude_from_defer',
         ] as $hook ) {
             add_filter( $hook, [ self::class, 'exclude' ] );
@@ -53,9 +54,12 @@ final class Assets {
      */
     public static function scriptAttributes( mixed $attrs ): mixed {
         if ( is_array( $attrs ) && in_array( $attrs['id'] ?? '', [ 'breakwater-js', 'breakwater-js-before', 'breakwater-js-after' ], true ) ) {
-            $attrs['data-no-optimize'] = '1';
-            $attrs['data-cfasync']     = 'false';
-            $attrs['data-nowprocket']  = '';
+            $attrs['data-no-optimize']   = '1';
+            $attrs['data-cfasync']       = 'false';
+            $attrs['data-nowprocket']    = '';
+            $attrs['data-cmp-ab']        = '1';
+            $attrs['data-cookieconsent'] = 'ignore';
+            $attrs['data-ot-ignore']     = '';
         }
         return $attrs;
     }
@@ -66,6 +70,10 @@ final class Assets {
             $list[] = 'breakwater';
         }
         return $list;
+    }
+
+    public static function allowHandle( mixed $allowed, mixed $handle = '' ): mixed {
+        return 'breakwater' === $handle ? true : $allowed;
     }
 
     public static function enqueueAdminStyle(): void {
